@@ -84,7 +84,7 @@ export default function CertificatePage() {
                   <div className="border-t-2 border-primary/50 pt-2">
                     <p className="font-semibold text-sm">Mojisola Alegbe</p>
                     <p className="text-xs text-foreground/60">Founder & Program Lead</p>
-                    <p className="text-xs text-foreground/60">EngBasecamp</p>
+                    <p className="text-xs text-foreground/60">ENG-Basecamp</p>
                   </div>
                 </div>
 

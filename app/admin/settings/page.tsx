@@ -22,7 +22,7 @@ export default function SettingsPage() {
       {/* Header */}
       <div className="mb-8 animate-slideInUp">
         <h1 className="text-3xl md:text-4xl font-bold mb-2">Settings</h1>
-        <p className="text-foreground/60">Configure your EngBasecamp instance</p>
+        <p className="text-foreground/60">Configure your ENG-Basecamp instance</p>
       </div>
 
       {/* Settings Form */}

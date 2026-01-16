@@ -94,7 +94,7 @@ export default function SignupPage() {
               <GraduationCap className="w-9 h-9 text-primary-foreground" />
             </div>
           </Link>
-          <h1 className="text-2xl font-bold">Join EngBasecamp</h1>
+          <h1 className="text-2xl font-bold">Join ENG-Basecamp</h1>
           <p className="text-foreground/60 mt-1">Create your account in 3 easy steps</p>
         </div>
 

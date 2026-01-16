@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Search, MoreVertical } from "lucide-react"
+import { Search, Plus, Edit2, Trash2 } from "lucide-react"
 
 const mockStudents = [
   { id: 1, name: "Alex Johnson", track: "Frontend", progress: 65, tasksCompleted: 13, email: "alex@example.com" },
@@ -14,6 +14,23 @@ const mockStudents = [
 export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterTrack, setFilterTrack] = useState<string>("all")
+  const [showAddModal, setShowAddModal] = useState(false)
+
+  const handleEditStudent = (studentId: number) => {
+    console.log("Edit student:", studentId)
+    // TODO: Implement edit functionality
+  }
+
+  const handleDeleteStudent = (studentId: number) => {
+    console.log("Delete student:", studentId)
+    // TODO: Implement delete functionality
+  }
+
+  const handleAddStudent = () => {
+    setShowAddModal(true)
+    console.log("Add new student")
+    // TODO: Implement add student functionality
+  }
 
   const filteredStudents = mockStudents.filter(
     (student) =>
@@ -27,8 +44,19 @@ export default function StudentsPage() {
     <div className="p-4 md:p-8 max-w-7xl">
       {/* Header */}
       <div className="mb-8 animate-slideInUp">
-        <h1 className="text-3xl md:text-4xl font-bold mb-2">Students Management</h1>
-        <p className="text-foreground/60">View and manage all students in your cohort</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">Students Management</h1>
+            <p className="text-foreground/60">View and manage all students in your cohort</p>
+          </div>
+          <button
+            onClick={handleAddStudent}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Student
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -101,15 +129,102 @@ export default function StudentsPage() {
                   </div>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <button className="p-2 hover:bg-card rounded-lg transition-colors">
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => handleEditStudent(student.id)}
+                      className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                      title="Edit Student"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteStudent(student.id)}
+                      className="p-2 text-accent hover:bg-accent/10 rounded-lg transition-colors"
+                      title="Delete Student"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Add Student Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Add New Student</h2>
+            <form className="space-y-4">
+              <div>
+                <label className="block font-medium mb-2">Full Name *</label>
+                <input
+                  type="text"
+                  placeholder="Enter student name"
+                  className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block font-medium mb-2">Email *</label>
+                <input
+                  type="email"
+                  placeholder="Enter email address"
+                  className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block font-medium mb-2">Track *</label>
+                <select
+                  className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                >
+                  <option value="">Select track</option>
+                  <option value="Frontend">Frontend Development</option>
+                  <option value="Backend">Backend Development</option>
+                  <option value="DevOps">DevOps / Cloud</option>
+                  <option value="Data">Data / AI / ML</option>
+                  <option value="Web3">Web3 / Blockchain</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block font-medium mb-2">Cohort *</label>
+                <select
+                  className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                >
+                  <option value="">Select cohort</option>
+                  <option value="Cohort 1">Cohort 1</option>
+                  <option value="Cohort 2">Cohort 2</option>
+                  <option value="Cohort 3">Cohort 3</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Add Student
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

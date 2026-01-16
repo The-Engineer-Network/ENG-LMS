@@ -45,7 +45,7 @@ export default function LoginPage() {
               <GraduationCap className="w-7 h-7 md:w-9 md:h-9 text-background" />
             </div>
           </Link>
-          <h1 className="text-2xl md:text-3xl font-bold">EngBasecamp</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">ENG-Basecamp</h1>
           <p className="text-foreground/60 mt-1 text-sm md:text-base">Sign in to your account</p>
         </div>
 
