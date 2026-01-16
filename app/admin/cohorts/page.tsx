@@ -139,7 +139,7 @@ export default function CohortsPage() {
                 </div>
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    cohort.status === "Active" ? "bg-green-500/20 text-green-400" : "bg-blue-500/20 text-blue-400"
+                    cohort.status === "Active" ? "bg-primary/20 text-primary" : "bg-secondary/20 text-secondary"
                   }`}
                 >
                   {cohort.status}

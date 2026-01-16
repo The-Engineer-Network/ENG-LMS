@@ -32,23 +32,23 @@ export default function StudentDashboard() {
   const completionPercentage = useMemo(() => mockData.student.progress, [])
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-8 animate-slideInUp">
-        <h1 className="text-3xl md:text-4xl font-bold mb-2">
+      <div className="mb-6 md:mb-8 animate-slideInUp">
+        <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2">
           Welcome back,{" "}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
             {mockData.student.name}
           </span>
         </h1>
-        <p className="text-foreground/60">
+        <p className="text-foreground/60 text-sm md:text-base">
           Track: <span className="font-semibold text-primary">{mockData.student.track}</span> • Cohort:{" "}
           <span className="font-semibold text-secondary">{mockData.student.cohort}</span>
         </p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
         {[
           {
             icon: TrendingUp,
@@ -146,10 +146,10 @@ export default function StudentDashboard() {
                     week.locked
                       ? "bg-border/50 text-foreground/50"
                       : week.status === "Approved"
-                        ? "bg-green-500/20 text-green-400"
+                        ? "bg-primary/20 text-primary"
                         : week.status === "Pending Submission"
-                          ? "bg-yellow-500/20 text-yellow-400"
-                          : "bg-blue-500/20 text-blue-400"
+                          ? "bg-accent/20 text-accent"
+                          : "bg-secondary/20 text-secondary"
                   }`}
                 >
                   {week.locked ? "Locked" : week.status}

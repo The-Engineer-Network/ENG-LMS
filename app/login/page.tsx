@@ -29,24 +29,24 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-card to-background flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-card to-background flex items-center justify-center px-4 py-8">
       <Link
         href="/"
-        className="absolute top-6 left-6 p-2 rounded-lg hover:bg-card border border-transparent hover:border-border transition-all group flex items-center gap-2 text-foreground/70 hover:text-foreground"
+        className="absolute top-4 md:top-6 left-4 md:left-6 p-2 rounded-lg hover:bg-card border border-transparent hover:border-border transition-all group flex items-center gap-2 text-foreground/70 hover:text-foreground"
       >
-        <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+        <ArrowLeft className="w-4 h-4 md:w-5 md:h-5 group-hover:-translate-x-1 transition-transform" />
         <span className="text-sm font-medium hidden sm:inline">Back</span>
       </Link>
 
       <div className="w-full max-w-md animate-slideInUp">
-        <div className="text-center mb-8">
+        <div className="text-center mb-6 md:mb-8">
           <Link href="/" className="inline-block mb-4 hover:opacity-80 transition-opacity">
-            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mx-auto shadow-lg shadow-primary/30">
-              <GraduationCap className="w-9 h-9 text-background" />
+            <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mx-auto shadow-lg shadow-primary/30">
+              <GraduationCap className="w-7 h-7 md:w-9 md:h-9 text-background" />
             </div>
           </Link>
-          <h1 className="text-3xl font-bold">CohortHub</h1>
-          <p className="text-foreground/60 mt-1">Sign in to your account</p>
+          <h1 className="text-2xl md:text-3xl font-bold">EngBasecamp</h1>
+          <p className="text-foreground/60 mt-1 text-sm md:text-base">Sign in to your account</p>
         </div>
 
         {/* Role Selection */}

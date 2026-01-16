@@ -54,7 +54,7 @@ export default function CertificatesPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div
-                  className={`p-3 rounded-lg ${cert.status === "Approved" ? "bg-green-500/20" : "bg-yellow-500/20"}`}
+                  className={`p-3 rounded-lg ${cert.status === "Approved" ? "bg-primary/20" : "bg-accent/20"}`}
                 >
                   {cert.status === "Approved" ? (
                     <CheckCircle2 className="w-6 h-6 text-green-400" />
@@ -77,7 +77,7 @@ export default function CertificatesPage() {
               <div className="flex items-center gap-2">
                 <span
                   className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                    cert.status === "Approved" ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"
+                    cert.status === "Approved" ? "bg-primary/20 text-primary" : "bg-accent/20 text-accent"
                   }`}
                 >
                   {cert.status}

@@ -94,7 +94,7 @@ export default function SignupPage() {
               <GraduationCap className="w-9 h-9 text-primary-foreground" />
             </div>
           </Link>
-          <h1 className="text-2xl font-bold">Join CohortHub</h1>
+          <h1 className="text-2xl font-bold">Join EngBasecamp</h1>
           <p className="text-foreground/60 mt-1">Create your account in 3 easy steps</p>
         </div>
 
@@ -110,9 +110,9 @@ export default function SignupPage() {
 
         {/* Validation Error */}
         {validationError && (
-          <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200 flex gap-3 animate-fadeInScale">
-            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-700">{validationError}</p>
+          <div className="mb-4 p-4 rounded-lg bg-accent/10 border border-accent/20 flex gap-3 animate-fadeInScale">
+            <AlertCircle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-accent">{validationError}</p>
           </div>
         )}
 

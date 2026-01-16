@@ -65,11 +65,11 @@ export default function TasksPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Approved":
-        return "bg-green-500/20 text-green-400 border-green-500/30"
+        return "bg-primary/20 text-primary border-primary/30"
       case "In Review":
-        return "bg-blue-500/20 text-blue-400 border-blue-500/30"
+        return "bg-secondary/20 text-secondary border-secondary/30"
       case "Pending":
-        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+        return "bg-accent/20 text-accent border-accent/30"
       default:
         return ""
     }

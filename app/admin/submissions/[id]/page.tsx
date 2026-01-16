@@ -146,8 +146,8 @@ export default function SubmissionReviewPage({ params }: { params: { id: string 
                 onClick={() => setAction("approve")}
                 className={`w-full px-4 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
                   action === "approve"
-                    ? "bg-green-500/20 text-green-400 border border-green-500/50"
-                    : "bg-background border border-border hover:border-green-500/50 text-foreground"
+                    ? "bg-primary/20 text-primary border border-primary/50"
+                    : "bg-background border border-border hover:border-primary/50 text-foreground"
                 }`}
               >
                 <CheckCircle2 className="w-5 h-5" />
@@ -158,8 +158,8 @@ export default function SubmissionReviewPage({ params }: { params: { id: string 
                 onClick={() => setAction("needs-changes")}
                 className={`w-full px-4 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
                   action === "needs-changes"
-                    ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
-                    : "bg-background border border-border hover:border-yellow-500/50 text-foreground"
+                    ? "bg-accent/20 text-accent border border-accent/50"
+                    : "bg-background border border-border hover:border-accent/50 text-foreground"
                 }`}
               >
                 <AlertCircle className="w-5 h-5" />
