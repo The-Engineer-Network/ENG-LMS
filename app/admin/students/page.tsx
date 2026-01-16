@@ -15,10 +15,14 @@ export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterTrack, setFilterTrack] = useState<string>("all")
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [selectedStudent, setSelectedStudent] = useState<any>(null)
 
   const handleEditStudent = (studentId: number) => {
+    const student = mockStudents.find(s => s.id === studentId)
+    setSelectedStudent(student)
+    setShowEditModal(true)
     console.log("Edit student:", studentId)
-    // TODO: Implement edit functionality
   }
 
   const handleDeleteStudent = (studentId: number) => {
@@ -30,6 +34,14 @@ export default function StudentsPage() {
     setShowAddModal(true)
     console.log("Add new student")
     // TODO: Implement add student functionality
+  }
+
+  const handleUpdateStudent = (e: React.FormEvent) => {
+    e.preventDefault()
+    console.log("Update student:", selectedStudent)
+    setShowEditModal(false)
+    setSelectedStudent(null)
+    // TODO: Implement update functionality
   }
 
   const filteredStudents = mockStudents.filter(
@@ -219,6 +231,97 @@ export default function StudentsPage() {
                   className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   Add Student
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Student Modal */}
+      {showEditModal && selectedStudent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Edit Student</h2>
+            <form onSubmit={handleUpdateStudent} className="space-y-4">
+              <div>
+                <label className="block font-medium mb-2">Full Name *</label>
+                <input
+                  type="text"
+                  defaultValue={selectedStudent.name}
+                  placeholder="Enter student name"
+                  className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block font-medium mb-2">Email *</label>
+                <input
+                  type="email"
+                  defaultValue={selectedStudent.email}
+                  placeholder="Enter email address"
+                  className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block font-medium mb-2">Track *</label>
+                <select
+                  defaultValue={selectedStudent.track}
+                  className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                >
+                  <option value="">Select track</option>
+                  <option value="Frontend">Frontend Development</option>
+                  <option value="Backend">Backend Development</option>
+                  <option value="DevOps">DevOps / Cloud</option>
+                  <option value="Data">Data / AI / ML</option>
+                  <option value="Web3">Web3 / Blockchain</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block font-medium mb-2">Progress</label>
+                <input
+                  type="number"
+                  defaultValue={selectedStudent.progress}
+                  min="0"
+                  max="100"
+                  placeholder="Progress percentage"
+                  className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium mb-2">Tasks Completed</label>
+                <input
+                  type="number"
+                  defaultValue={selectedStudent.tasksCompleted}
+                  min="0"
+                  max="20"
+                  placeholder="Tasks completed"
+                  className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setSelectedStudent(null)
+                  }}
+                  className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Update Student
                 </button>
               </div>
             </form>
