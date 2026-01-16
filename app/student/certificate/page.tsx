@@ -1,139 +1,165 @@
 "use client"
 
-import { Download, CheckCircle2, Award } from "lucide-react"
+import { Download, Lock, Award, CheckCircle2 } from "lucide-react"
 
 export default function CertificatePage() {
-  const isApproved = true
-  const studentName = "Shalom Alalade"
-  const track = "Frontend Development"
-  const cohort = "Cohort 1"
-  const completionDate = "February 28, 2024"
+  // Mock data - in real app, this would come from API
+  const certificateData = {
+    isApproved: false, // Change to true to test approved state
+    studentName: "Shalom Alalade",
+    track: "Frontend Development",
+    cohort: "Cohort 1",
+    completionDate: "February 28, 2024",
+    certificateFile: "shalom-alalade-certificate.pdf",
+    tasksCompleted: 17,
+    totalTasks: 20
+  }
+
+  const handleDownload = () => {
+    console.log("Downloading certificate:", certificateData.certificateFile)
+    // TODO: Implement actual file download
+  }
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl">
+    <div className="p-4 md:p-8 max-w-4xl">
       {/* Header */}
       <div className="mb-8 animate-slideInUp">
         <h1 className="text-3xl md:text-4xl font-bold mb-2">Certificate</h1>
-        <p className="text-foreground/60">Your achievement and completion status</p>
+        <p className="text-foreground/60">Your program completion certificate</p>
       </div>
 
-      {isApproved ? (
-        <div className="animate-fadeInScale">
-          {/* Certificate Container with Golden Border */}
-          <div className="relative p-12 md:p-16 rounded-xl border-8 border-secondary bg-white shadow-2xl">
-            {/* Golden decorative top ribbon */}
-            <div className="absolute -top-6 left-12 w-24 h-12 bg-secondary rounded-b-lg shadow-lg flex items-end justify-center">
-              <div className="w-20 h-1 bg-primary rounded-full"></div>
+      {certificateData.isApproved ? (
+        <div className="animate-fadeInScale space-y-6">
+          {/* Certificate Status */}
+          <div className="p-6 rounded-xl bg-primary/10 border border-primary/20">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-lg bg-primary/20">
+                <CheckCircle2 className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-primary">Certificate Ready!</h2>
+                <p className="text-foreground/70">
+                  Congratulations! Your {certificateData.track} certificate has been approved and is ready for download.
+                </p>
+              </div>
             </div>
+          </div>
 
-            {/* Content */}
-            <div className="text-center space-y-8">
-              {/* Top Logo/Icon Area */}
-              <div className="flex justify-between items-start px-8">
-                {/* Left: Logo Placeholder */}
-                <div className="w-24 h-24 rounded-full border-4 border-primary flex items-center justify-center bg-primary/5">
-                  <span className="text-xl font-bold text-primary">CEN</span>
+          {/* Certificate Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 rounded-xl bg-card border border-border">
+              <h3 className="font-semibold mb-4">Certificate Details</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-foreground/60">Student:</span>
+                  <span className="font-medium">{certificateData.studentName}</span>
                 </div>
-
-                {/* Center: Main Title */}
-                <div className="flex-1 mx-8">
-                  <h2 className="text-4xl md:text-5xl font-serif font-bold text-primary tracking-wide">
-                    CERTIFICATE OF
-                  </h2>
-                  <h2 className="text-4xl md:text-5xl font-serif font-bold text-primary tracking-wide">COMPLETION</h2>
+                <div className="flex justify-between">
+                  <span className="text-foreground/60">Program:</span>
+                  <span className="font-medium">{certificateData.track}</span>
                 </div>
-
-                {/* Right: Gold Medal/Award */}
-                <div className="w-24 h-32 flex flex-col items-center justify-start">
-                  <Award className="w-16 h-16 text-secondary mb-2" />
-                  <div className="w-16 h-6 bg-secondary rounded-b-lg"></div>
+                <div className="flex justify-between">
+                  <span className="text-foreground/60">Cohort:</span>
+                  <span className="font-medium">{certificateData.cohort}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-foreground/60">Completion Date:</span>
+                  <span className="font-medium">{certificateData.completionDate}</span>
                 </div>
               </div>
+            </div>
 
-              {/* Divider */}
-              <div className="h-1 bg-gradient-to-r from-transparent via-primary to-transparent"></div>
+            <div className="p-6 rounded-xl bg-card border border-border">
+              <h3 className="font-semibold mb-4">Program Statistics</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-foreground/60">Tasks Completed:</span>
+                  <span className="font-medium">{certificateData.tasksCompleted}/{certificateData.totalTasks}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-foreground/60">Completion Rate:</span>
+                  <span className="font-medium">100%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-foreground/60">Status:</span>
+                  <span className="font-medium text-primary">Graduated</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-              {/* Main Text */}
-              <div className="space-y-4 py-8">
-                <p className="text-lg text-foreground/70 font-light">This certificate is proudly presented to</p>
+          {/* Download Section */}
+          <div className="p-8 rounded-xl bg-gradient-to-r from-primary/10 via-secondary/10 to-accent/10 border border-primary/20 text-center">
+            <Award className="w-16 h-16 text-primary mx-auto mb-4" />
+            <h3 className="text-2xl font-bold mb-2">Download Your Certificate</h3>
+            <p className="text-foreground/70 mb-6">
+              Your official completion certificate is ready. You can download it and share it on LinkedIn, your portfolio, or with potential employers.
+            </p>
+            
+            <button
+              onClick={handleDownload}
+              className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-primary to-secondary text-white rounded-lg hover:shadow-lg hover:shadow-primary/30 transition-all transform hover:scale-105 font-semibold text-lg"
+            >
+              <Download className="w-6 h-6" />
+              Download Certificate
+            </button>
+            
+            <p className="text-xs text-foreground/50 mt-4">
+              File: {certificateData.certificateFile} • PDF Format
+            </p>
+          </div>
 
-                {/* Student Name */}
-                <h3 className="text-4xl md:text-5xl font-serif font-bold text-primary border-b-2 border-primary/30 pb-4">
-                  {studentName}
-                </h3>
+          {/* Sharing Tips */}
+          <div className="p-6 rounded-xl bg-secondary/10 border border-secondary/20">
+            <h3 className="font-semibold mb-3 text-secondary">💡 Sharing Tips</h3>
+            <ul className="text-sm text-foreground/70 space-y-2">
+              <li>• Add this certificate to your LinkedIn profile under "Licenses & Certifications"</li>
+              <li>• Include it in your portfolio to showcase your technical skills</li>
+              <li>• Mention your completion in job applications and interviews</li>
+              <li>• Share your achievement on social media to inspire others</li>
+            </ul>
+          </div>
+        </div>
+      ) : (
+        <div className="animate-fadeInScale">
+          {/* Locked State */}
+          <div className="p-8 rounded-xl border-2 border-accent/20 bg-accent/5 text-center">
+            <div className="space-y-6">
+              <div className="p-4 rounded-full bg-accent/20 w-20 h-20 flex items-center justify-center mx-auto">
+                <Lock className="w-10 h-10 text-accent" />
+              </div>
+              
+              <div>
+                <h2 className="text-2xl font-bold mb-2">Certificate Not Available</h2>
+                <p className="text-foreground/70 mb-4">
+                  Your certificate will be available once you complete all program requirements and it's approved by the admin.
+                </p>
+              </div>
 
-                {/* Achievement Text */}
-                <div className="space-y-2 py-6">
-                  <p className="text-lg font-semibold text-foreground">Awarded for the successful completion of the</p>
-                  <p className="text-2xl font-bold text-primary">{track} Program</p>
-                  <p className="text-sm text-foreground/60 pt-2">
-                    in recognition of dedication, hard work, and active participation.
+              {/* Progress Info */}
+              <div className="p-6 rounded-lg bg-card border border-border max-w-md mx-auto">
+                <h3 className="font-semibold mb-4">Current Progress</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span>Tasks Completed:</span>
+                    <span className="font-medium">{certificateData.tasksCompleted}/{certificateData.totalTasks}</span>
+                  </div>
+                  <div className="w-full bg-border rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-primary to-secondary h-2 rounded-full transition-all"
+                      style={{ width: `${(certificateData.tasksCompleted / certificateData.totalTasks) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-foreground/60 text-center">
+                    {certificateData.totalTasks - certificateData.tasksCompleted} tasks remaining
                   </p>
                 </div>
               </div>
 
-              {/* Divider */}
-              <div className="h-1 bg-gradient-to-r from-transparent via-primary to-transparent"></div>
-
-              {/* Signature Area */}
-              <div className="grid grid-cols-2 gap-8 pt-8">
-                <div className="text-center">
-                  <div className="h-16 flex items-end justify-center mb-2">
-                    <span className="text-3xl font-serif text-foreground/40">Mojisola</span>
-                  </div>
-                  <div className="border-t-2 border-primary/50 pt-2">
-                    <p className="font-semibold text-sm">Mojisola Alegbe</p>
-                    <p className="text-xs text-foreground/60">Founder & Program Lead</p>
-                    <p className="text-xs text-foreground/60">ENG-Basecamp</p>
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <p className="text-lg text-secondary font-bold mb-4">✓</p>
-                  <div className="border-t-2 border-primary/50 pt-2">
-                    <p className="text-xs text-foreground/60">Issued on</p>
-                    <p className="font-semibold text-sm">{completionDate}</p>
-                    <p className="text-xs text-foreground/60">Cohort: {cohort}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Certificate ID */}
-              <div className="pt-4 text-center">
-                <p className="text-xs text-foreground/50">
-                  Certificate ID: CH-FE-2024-{Math.random().toString(36).substr(2, 9).toUpperCase()}
-                </p>
-              </div>
+              <p className="text-sm text-foreground/60">
+                Complete all tasks and wait for admin approval to unlock your certificate.
+              </p>
             </div>
-          </div>
-
-          {/* Download Button */}
-          <div className="mt-8 flex justify-center">
-            <button className="px-8 py-3 rounded-lg bg-gradient-to-r from-primary to-secondary text-primary-foreground font-semibold hover:shadow-lg hover:shadow-primary/50 transition-all flex items-center gap-2">
-              <Download className="w-5 h-5" />
-              Download Certificate
-            </button>
-          </div>
-
-          {/* Info Box */}
-          <div className="mt-8 p-6 rounded-xl bg-secondary/10 border border-secondary/30 animate-slideInLeft">
-            <div className="flex gap-3">
-              <CheckCircle2 className="w-6 h-6 text-secondary flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-semibold mb-2">Congratulations!</h3>
-                <p className="text-foreground/60 text-sm">
-                  You have successfully completed the {track} program. Your certificate is now ready for download and
-                  can be shared on LinkedIn and your portfolio.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="p-8 rounded-xl border-2 border-primary/20 bg-primary/5 animate-pulse-glow">
-          <div className="text-center space-y-6">
-            <h2 className="text-3xl font-bold">Certificate Locked</h2>
-            <p className="text-foreground/60">Complete all required tasks to unlock your certificate</p>
           </div>
         </div>
       )}

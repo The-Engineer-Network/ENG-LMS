@@ -1,22 +1,102 @@
 "use client"
 
 import { useState } from "react"
-import { CheckCircle2, Lock, Download } from "lucide-react"
+import { CheckCircle2, Lock, Download, Upload, Trash2 } from "lucide-react"
 
 const mockCertificates = [
-  { id: 1, student: "Alex Johnson", track: "Frontend", status: "Approved", approvedDate: "2024-02-20" },
-  { id: 2, student: "Sarah Chen", track: "Backend", status: "Pending", tasksLeft: 1 },
-  { id: 3, student: "Mike Johnson", track: "DevOps", status: "Approved", approvedDate: "2024-02-18" },
-  { id: 4, student: "Emily Davis", track: "Web3", status: "Pending", tasksLeft: 3 },
-  { id: 5, student: "Jordan Smith", track: "Frontend", status: "Approved", approvedDate: "2024-02-15" },
+  { 
+    id: 1, 
+    student: "Alex Johnson", 
+    email: "alex@example.com",
+    track: "Frontend", 
+    status: "Ready for Upload", 
+    tasksCompleted: 20,
+    totalTasks: 20
+  },
+  { 
+    id: 2, 
+    student: "Sarah Chen", 
+    email: "sarah@example.com",
+    track: "Backend", 
+    status: "Pending", 
+    tasksCompleted: 19,
+    totalTasks: 20
+  },
+  { 
+    id: 3, 
+    student: "Mike Johnson", 
+    email: "mike@example.com",
+    track: "DevOps", 
+    status: "Ready for Upload", 
+    tasksCompleted: 20,
+    totalTasks: 20
+  },
+  { 
+    id: 4, 
+    student: "Emily Davis", 
+    email: "emily@example.com",
+    track: "Web3", 
+    status: "Ready for Upload", 
+    tasksCompleted: 20,
+    totalTasks: 20
+  },
+  { 
+    id: 5, 
+    student: "Jordan Smith", 
+    email: "jordan@example.com",
+    track: "Frontend", 
+    status: "Pending", 
+    tasksCompleted: 17,
+    totalTasks: 20
+  },
 ]
 
 export default function CertificatesPage() {
   const [filter, setFilter] = useState<string>("all")
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [selectedStudent, setSelectedStudent] = useState<any>(null)
 
   const filteredCerts = mockCertificates.filter(
     (cert) => filter === "all" || cert.status.toLowerCase() === filter.toLowerCase(),
   )
+
+  const handleUploadCertificate = (student: any) => {
+    setSelectedStudent(student)
+    setShowUploadModal(true)
+  }
+
+  const handleDeleteCertificate = (studentId: number) => {
+    console.log("Delete certificate for student:", studentId)
+    // TODO: Implement delete functionality
+  }
+
+  const handleFileUpload = (e: React.FormEvent) => {
+    e.preventDefault()
+    console.log("Upload certificate for:", selectedStudent)
+    setShowUploadModal(false)
+    setSelectedStudent(null)
+    // TODO: Implement file upload functionality
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Pending":
+        return "bg-accent/20 text-accent"
+      case "Ready for Upload":
+        return "bg-secondary/20 text-secondary"
+      default:
+        return "bg-muted text-muted-foreground"
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "Ready for Upload":
+        return <Upload className="w-6 h-6 text-secondary" />
+      default:
+        return <Lock className="w-6 h-6 text-accent" />
+    }
+  }
 
   return (
     <div className="p-4 md:p-8 max-w-7xl">
@@ -28,7 +108,7 @@ export default function CertificatesPage() {
 
       {/* Filters */}
       <div className="flex gap-2 mb-8">
-        {["all", "Approved", "Pending"].map((status) => (
+        {["all", "Pending", "Ready for Upload"].map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
@@ -53,43 +133,40 @@ export default function CertificatesPage() {
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div
-                  className={`p-3 rounded-lg ${cert.status === "Approved" ? "bg-primary/20" : "bg-accent/20"}`}
-                >
-                  {cert.status === "Approved" ? (
-                    <CheckCircle2 className="w-6 h-6 text-green-400" />
-                  ) : (
-                    <Lock className="w-6 h-6 text-yellow-400" />
-                  )}
+                <div className={`p-3 rounded-lg ${cert.status === "Ready for Upload" ? "bg-secondary/20" : "bg-accent/20"}`}>
+                  {getStatusIcon(cert.status)}
                 </div>
                 <div>
                   <h3 className="text-lg font-bold">{cert.student}</h3>
+                  <p className="text-sm text-foreground/60">{cert.email}</p>
                   <p className="text-sm text-foreground/60">{cert.track} Track</p>
-                  {cert.status === "Pending" && "tasksLeft" in cert && (
-                    <p className="text-xs text-foreground/40 mt-1">{cert.tasksLeft} tasks remaining</p>
+                  
+                  {cert.status === "Pending" && "tasksCompleted" in cert && (
+                    <p className="text-xs text-foreground/40 mt-1">
+                      {cert.tasksCompleted}/{cert.totalTasks} tasks completed
+                    </p>
                   )}
-                  {cert.status === "Approved" && "approvedDate" in cert && (
-                    <p className="text-xs text-green-400 mt-1">Approved on {cert.approvedDate}</p>
+                  
+                  {cert.status === "Ready for Upload" && "tasksCompleted" in cert && (
+                    <p className="text-xs text-secondary mt-1">
+                      All tasks completed - Ready for certificate upload
+                    </p>
                   )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                    cert.status === "Approved" ? "bg-primary/20 text-primary" : "bg-accent/20 text-accent"
-                  }`}
-                >
+                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(cert.status)}`}>
                   {cert.status}
                 </span>
-                {cert.status === "Pending" && (
-                  <button className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm hover:opacity-90 transition-opacity">
-                    Approve
-                  </button>
-                )}
-                {cert.status === "Approved" && (
-                  <button className="p-2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors">
-                    <Download className="w-5 h-5" />
+                
+                {cert.status === "Ready for Upload" && (
+                  <button 
+                    onClick={() => handleUploadCertificate(cert)}
+                    className="px-4 py-2 rounded-lg bg-secondary text-white text-sm hover:bg-secondary/90 transition-colors flex items-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Upload Certificate
                   </button>
                 )}
               </div>
@@ -97,6 +174,63 @@ export default function CertificatesPage() {
           </div>
         ))}
       </div>
+
+      {/* Upload Certificate Modal */}
+      {showUploadModal && selectedStudent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Upload Certificate</h2>
+            <div className="mb-4 p-4 bg-muted rounded-lg">
+              <h3 className="font-medium">{selectedStudent.student}</h3>
+              <p className="text-sm text-foreground/60">{selectedStudent.email}</p>
+              <p className="text-sm text-foreground/60">{selectedStudent.track} Track</p>
+            </div>
+            
+            <form onSubmit={handleFileUpload} className="space-y-4">
+              <div>
+                <label className="block font-medium mb-2">Certificate File *</label>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                />
+                <p className="text-xs text-foreground/60 mt-1">
+                  Accepted formats: PDF, JPG, PNG (Max 5MB)
+                </p>
+              </div>
+              
+              <div>
+                <label className="block font-medium mb-2">Notes (Optional)</label>
+                <textarea
+                  placeholder="Add any notes about this certificate..."
+                  className="w-full p-3 border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUploadModal(false)
+                    setSelectedStudent(null)
+                  }}
+                  className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Upload Certificate
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

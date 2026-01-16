@@ -16,6 +16,9 @@ export default function StudentLayout({
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // Mock certificate status - in real app, this would come from API/context
+  const certificateApproved = false // Change this based on actual student status
+
   const menuItems = [
     { href: "/student/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/student/weeks", label: "Weeks", icon: Calendar },
@@ -23,7 +26,7 @@ export default function StudentLayout({
     { href: "/student/clarity-calls", label: "Clarity Calls", icon: Phone },
     { href: "/student/accountability", label: "Accountability Partner", icon: User },
     { href: "/student/chat", label: "Chat", icon: MessageSquare },
-    { href: "/student/certificate", label: "Certificate", icon: Award },
+    { href: "/student/certificate", label: "Certificate", icon: Award, disabled: !certificateApproved },
     { href: "/student/profile", label: "Profile", icon: User },
   ]
 
@@ -87,16 +90,27 @@ export default function StudentLayout({
           {menuItems.map((item) => (
             <Link
               key={item.href}
-              href={item.href}
-              onClick={() => setSidebarOpen(false)}
+              href={item.disabled ? "#" : item.href}
+              onClick={(e) => {
+                if (item.disabled) {
+                  e.preventDefault()
+                  return
+                }
+                setSidebarOpen(false)
+              }}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                pathname === item.href
+                pathname === item.href && !item.disabled
                   ? "bg-primary text-primary-foreground"
-                  : "text-foreground/70 hover:text-foreground hover:bg-muted"
+                  : item.disabled
+                    ? "text-foreground/30 cursor-not-allowed"
+                    : "text-foreground/70 hover:text-foreground hover:bg-muted"
               }`}
             >
               <item.icon className="w-5 h-5" />
               <span className="font-medium">{item.label}</span>
+              {item.disabled && (
+                <span className="text-xs bg-muted px-2 py-1 rounded">Locked</span>
+              )}
             </Link>
           ))}
         </nav>
