@@ -2,37 +2,21 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { GraduationCap, Mail, Lock, User, BookOpen, Users, AlertCircle, ArrowLeft } from "lucide-react"
-
-// Mock data for tracks and cohorts
-const TRACKS = [
-  { id: "frontend", name: "Frontend Development" },
-  { id: "backend", name: "Backend Development" },
-  { id: "devops", name: "DevOps / Cloud" },
-  { id: "data", name: "Data / AI / ML" },
-  { id: "web3", name: "Web3" },
-]
-
-const COHORTS = [
-  { id: "cohort-1", name: "Cohort 1" },
-  { id: "cohort-2", name: "Cohort 2" },
-  { id: "cohort-3", name: "Cohort 3" },
-]
-
-// Mock paid learner whitelist
-const PAID_LEARNERS = [
-  { email: "alex@example.com", track: "frontend", cohort: "cohort-1" },
-  { email: "sam@example.com", track: "backend", cohort: "cohort-2" },
-  { email: "jordan@example.com", track: "devops", cohort: "cohort-1" },
-]
+import { getTracks, getCohorts, checkWhitelistStatus } from "../../lib/data"
+import { signUp } from "../../lib/auth"
+import type { Track, Cohort } from "../../lib/supabase"
 
 export default function SignupPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [validationError, setValidationError] = useState("")
+  const [emailStatus, setEmailStatus] = useState<'unchecked' | 'checking' | 'valid' | 'invalid'>('unchecked')
+  const [tracks, setTracks] = useState<Track[]>([])
+  const [cohorts, setCohorts] = useState<Cohort[]>([])
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -42,8 +26,79 @@ export default function SignupPage() {
   })
   const [loading, setLoading] = useState(false)
 
+  // Load tracks and cohorts on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [tracksData, cohortsData] = await Promise.all([
+          getTracks(),
+          getCohorts()
+        ])
+        setTracks(tracksData)
+        setCohorts(cohortsData)
+      } catch (error) {
+        console.error('Error loading data:', error)
+      }
+    }
+    loadData()
+  }, [])
+
+  // Check email whitelist status when email, track, or cohort changes
+  useEffect(() => {
+    const checkEmailStatus = async () => {
+      if (formData.email && formData.track && formData.cohort) {
+        setEmailStatus('checking')
+        try {
+          const isWhitelisted = await checkWhitelistStatus(formData.email, formData.track, formData.cohort)
+          setEmailStatus(isWhitelisted ? 'valid' : 'invalid')
+          
+          if (!isWhitelisted) {
+            setValidationError("Your email is not registered for this track and cohort combination.")
+          } else {
+            setValidationError("")
+          }
+        } catch (error) {
+          setEmailStatus('invalid')
+          setValidationError("Unable to verify email status. Please try again.")
+        }
+      } else {
+        setEmailStatus('unchecked')
+        setValidationError("")
+      }
+    }
+
+    // Debounce the check
+    const timeoutId = setTimeout(checkEmailStatus, 500)
+    return () => clearTimeout(timeoutId)
+  }, [formData.email, formData.track, formData.cohort])
+
   const handleNext = () => {
     setValidationError("")
+    
+    // Validate step 1
+    if (step === 1) {
+      if (!formData.fullName || !formData.email || !formData.password) {
+        setValidationError("Please fill in all fields")
+        return
+      }
+    }
+    
+    // Validate step 2
+    if (step === 2) {
+      if (!formData.track || !formData.cohort) {
+        setValidationError("Please select both track and cohort")
+        return
+      }
+      if (emailStatus === 'invalid') {
+        setValidationError("Your email is not registered for this track and cohort combination.")
+        return
+      }
+      if (emailStatus === 'checking') {
+        setValidationError("Please wait while we verify your email...")
+        return
+      }
+    }
+    
     if (step < 3) setStep(step + 1)
   }
 
@@ -57,24 +112,22 @@ export default function SignupPage() {
     setLoading(true)
     setValidationError("")
 
-    // Check if email exists in paid learner whitelist
-    const paidLearner = PAID_LEARNERS.find(
-      (learner) =>
-        learner.email === formData.email && learner.track === formData.track && learner.cohort === formData.cohort,
-    )
+    try {
+      // Final check - this should pass since we validated in step 2
+      if (emailStatus !== 'valid') {
+        setValidationError("Email validation failed. Please go back and verify your information.")
+        setLoading(false)
+        return
+      }
 
-    // Simulate API call
-    await new Promise((r) => setTimeout(r, 800))
-
-    if (!paidLearner) {
-      setValidationError(
-        "Your email is not registered for this program. If you believe this is an error, please contact us at info@engineernetwork.com",
-      )
+      // Create user account - the signUp function will handle whitelist check again
+      await signUp(formData.email, formData.password, formData.fullName, formData.track, formData.cohort)
+      
+      router.push("/student/dashboard")
+    } catch (error: any) {
+      setValidationError(error.message || "An error occurred during signup. Please try again.")
       setLoading(false)
-      return
     }
-
-    router.push("/student/dashboard")
   }
 
   return (
@@ -139,9 +192,36 @@ export default function SignupPage() {
                   placeholder="Email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full pl-10 pr-4 py-3 rounded-lg bg-card border border-border text-foreground placeholder:text-foreground/40 focus:outline-none focus:border-primary transition-colors"
+                  className={`w-full pl-10 pr-4 py-3 rounded-lg bg-card border text-foreground placeholder:text-foreground/40 focus:outline-none transition-colors ${
+                    emailStatus === 'valid' ? 'border-green-500 focus:border-green-500' :
+                    emailStatus === 'invalid' ? 'border-red-500 focus:border-red-500' :
+                    'border-border focus:border-primary'
+                  }`}
                   required
                 />
+                {emailStatus === 'checking' && (
+                  <div className="absolute right-3 top-3.5">
+                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+                {emailStatus === 'valid' && (
+                  <div className="absolute right-3 top-3.5">
+                    <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                )}
+                {emailStatus === 'invalid' && (
+                  <div className="absolute right-3 top-3.5">
+                    <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-3.5 w-5 h-5 text-foreground/40" />
@@ -169,7 +249,7 @@ export default function SignupPage() {
                   required
                 >
                   <option value="">Select your track</option>
-                  {TRACKS.map((track) => (
+                  {tracks.map((track) => (
                     <option key={track.id} value={track.id}>
                       {track.name}
                     </option>
@@ -186,7 +266,7 @@ export default function SignupPage() {
                   required
                 >
                   <option value="">Select your cohort</option>
-                  {COHORTS.map((cohort) => (
+                  {cohorts.map((cohort) => (
                     <option key={cohort.id} value={cohort.id}>
                       {cohort.name}
                     </option>
@@ -196,7 +276,10 @@ export default function SignupPage() {
 
               <div className="p-4 rounded-lg bg-secondary/10 border border-secondary/30 text-left">
                 <p className="text-sm text-foreground/70">
-                  Please ensure your track and cohort match your enrollment details for validation.
+                  {emailStatus === 'unchecked' && "Please select your track and cohort to verify your enrollment."}
+                  {emailStatus === 'checking' && "Verifying your enrollment..."}
+                  {emailStatus === 'valid' && "✓ Your email is registered for this track and cohort!"}
+                  {emailStatus === 'invalid' && "⚠️ Your email is not registered for this track and cohort combination."}
                 </p>
               </div>
             </div>
@@ -216,11 +299,11 @@ export default function SignupPage() {
                 </div>
                 <div>
                   <p className="text-xs text-foreground/60">Track</p>
-                  <p className="font-semibold">{TRACKS.find((t) => t.id === formData.track)?.name}</p>
+                  <p className="font-semibold">{tracks.find((t) => t.id === formData.track)?.name}</p>
                 </div>
                 <div>
                   <p className="text-xs text-foreground/60">Cohort</p>
-                  <p className="font-semibold">{COHORTS.find((c) => c.id === formData.cohort)?.name}</p>
+                  <p className="font-semibold">{cohorts.find((c) => c.id === formData.cohort)?.name}</p>
                 </div>
               </div>
               <p className="text-xs text-foreground/60 text-center">

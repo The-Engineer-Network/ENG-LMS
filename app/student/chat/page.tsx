@@ -3,88 +3,61 @@
 import { useState, useRef, useEffect } from "react"
 import { Send, Paperclip, Image as ImageIcon, X, ArrowLeft } from "lucide-react"
 import Image from "next/image"
-
-// Mock data for accountability partner
-const mockAccountabilityPartner = {
-  id: 1,
-  name: "Sarah Chen",
-  email: "sarah@example.com",
-  avatar: "/placeholder-user.jpg",
-  track: "Frontend Development",
-  cohort: "Cohort 1",
-  online: true,
-  lastSeen: "2024-02-20T15:30:00Z"
-}
-
-const mockMessages = [
-  {
-    id: 1,
-    senderId: 1,
-    senderName: "Sarah Chen",
-    content: "Hey! How's your React component assignment going?",
-    timestamp: "2024-02-20T14:30:00Z",
-    type: "text"
-  },
-  {
-    id: 2,
-    senderId: "current-user",
-    senderName: "You",
-    content: "Going well! I'm working on the state management part. Having some trouble with useEffect though.",
-    timestamp: "2024-02-20T14:32:00Z",
-    type: "text"
-  },
-  {
-    id: 3,
-    senderId: 1,
-    senderName: "Sarah Chen",
-    content: "Oh I had the same issue! The dependency array is tricky. Want to hop on a quick call to go through it?",
-    timestamp: "2024-02-20T14:35:00Z",
-    type: "text"
-  },
-  {
-    id: 4,
-    senderId: "current-user",
-    senderName: "You",
-    content: "That would be amazing! I'm free now if you are.",
-    timestamp: "2024-02-20T14:36:00Z",
-    type: "text"
-  },
-  {
-    id: 5,
-    senderId: 1,
-    senderName: "Sarah Chen",
-    content: "Perfect! Let me set up a quick Zoom room. I'll send the link in a sec.",
-    timestamp: "2024-02-20T14:37:00Z",
-    type: "text"
-  },
-  {
-    id: 6,
-    senderId: "current-user",
-    senderName: "You",
-    content: "Here's my component code so far",
-    timestamp: "2024-02-20T14:40:00Z",
-    type: "file",
-    fileName: "Counter.tsx",
-    fileSize: "2.1 KB"
-  },
-  {
-    id: 7,
-    senderId: 1,
-    senderName: "Sarah Chen",
-    content: "Let me show you the error I was getting",
-    timestamp: "2024-02-20T14:42:00Z",
-    type: "image",
-    fileName: "error-screenshot.png",
-    imageUrl: "/placeholder.jpg"
-  }
-]
+import { useAuth } from "@/lib/hooks/useAuth"
+import { useChat } from "@/lib/hooks/useChat"
+import { getAccountabilityPartner } from "@/lib/data"
 
 export default function ChatPage() {
+  const { user, loading: authLoading } = useAuth()
   const [newMessage, setNewMessage] = useState("")
   const [showMobileChat, setShowMobileChat] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [partner, setPartner] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Get partner ID for chat
+  const partnerId = partner ? (partner.student1_id === user?.id ? partner.student2_id : partner.student1_id) : null
+  
+  // Use real-time chat hook
+  const { messages, loading: chatLoading, sendMessage } = useChat(user?.id || '', partnerId || '')
+
+  useEffect(() => {
+    async function loadPartner() {
+      if (!user?.id) return
+      
+      try {
+        const partnerData = await getAccountabilityPartner(user.id)
+        if (partnerData) {
+          // Determine which student is the partner (not the current user)
+          const isStudent1 = partnerData.student1_id === user.id
+          const partnerProfile = isStudent1 ? partnerData.student2 : partnerData.student1
+          
+          // Transform to match expected structure
+          const mockAccountabilityPartner = {
+            id: partnerProfile?.id || 1,
+            name: partnerProfile?.full_name || 'Partner',
+            email: partnerProfile?.email || 'partner@example.com',
+            avatar: partnerProfile?.profile_picture_url || "/placeholder-user.jpg",
+            track: partnerData.track?.name || 'Development',
+            cohort: (partnerData as any).cohort?.name || 'Cohort 1',
+            online: true, // This would need real presence detection
+            lastSeen: new Date().toISOString()
+          }
+          setPartner({ ...partnerData, ...mockAccountabilityPartner })
+        }
+      } catch (error) {
+        console.error('Error loading partner:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!authLoading && user) {
+      loadPartner()
+    }
+  }, [user, authLoading])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -92,21 +65,20 @@ export default function ChatPage() {
 
   useEffect(() => {
     scrollToBottom()
-  }, [])
+  }, [messages])
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMessage.trim() && selectedFiles.length === 0) return
+    if (!partnerId) return
 
-    console.log("Sending message:", {
-      partnerId: mockAccountabilityPartner.id,
-      content: newMessage,
-      files: selectedFiles,
-      type: selectedFiles.length > 0 ? "file" : "text"
-    })
-
-    setNewMessage("")
-    setSelectedFiles([])
+    try {
+      await sendMessage(newMessage, selectedFiles.length > 0 ? "file" : "text")
+      setNewMessage("")
+      setSelectedFiles([])
+    } catch (error) {
+      console.error('Error sending message:', error)
+    }
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,6 +104,34 @@ export default function ChatPage() {
       minute: '2-digit' 
     })
   }
+
+  if (authLoading || loading) {
+    return (
+      <div className="h-[calc(100vh-4rem)] md:h-screen flex bg-background">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-pulse text-center">
+            <div className="h-8 bg-muted rounded w-48 mb-4 mx-auto"></div>
+            <div className="h-4 bg-muted rounded w-32 mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!partner) {
+    return (
+      <div className="h-[calc(100vh-4rem)] md:h-screen flex bg-background">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">No Partner Assigned</h2>
+            <p className="text-foreground/60">You need to be paired with an accountability partner to use chat.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const mockAccountabilityPartner = partner
 
   return (
     <div className="h-[calc(100vh-4rem)] md:h-screen flex bg-background">
@@ -234,57 +234,70 @@ export default function ChatPage() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {mockMessages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${
-                message.senderId === "current-user" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                  message.senderId === "current-user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                }`}
-              >
-                {message.type === "text" && (
-                  <p className="text-sm">{message.content}</p>
-                )}
-                
-                {message.type === "file" && (
-                  <div className="flex items-center gap-3 p-2 bg-background/10 rounded-lg">
-                    <Paperclip className="w-4 h-4" />
-                    <div>
-                      <p className="text-sm font-medium">{message.fileName}</p>
-                      <p className="text-xs opacity-70">{message.fileSize}</p>
-                    </div>
-                  </div>
-                )}
-                
-                {message.type === "image" && (
-                  <div>
-                    <Image
-                      src={message.imageUrl || "/placeholder.jpg"}
-                      alt={message.fileName || "Shared image"}
-                      width={200}
-                      height={150}
-                      className="rounded-lg mb-2"
-                    />
-                    <p className="text-xs opacity-70">{message.fileName}</p>
-                  </div>
-                )}
-                
-                <p className={`text-xs mt-1 ${
-                  message.senderId === "current-user" 
-                    ? "text-primary-foreground/70" 
-                    : "text-muted-foreground"
-                }`}>
-                  {formatTime(message.timestamp)}
-                </p>
+          {chatLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-pulse text-foreground/60">Loading messages...</div>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <p className="text-foreground/60 mb-2">No messages yet</p>
+                <p className="text-sm text-foreground/40">Start a conversation with your accountability partner!</p>
               </div>
             </div>
-          ))}
+          ) : (
+            messages.map((message: any) => (
+              <div
+                key={message.id}
+                className={`flex ${
+                  message.sender_id === user?.id ? "justify-end" : "justify-start"
+                }`}
+              >
+                <div
+                  className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                    message.sender_id === user?.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted"
+                  }`}
+                >
+                  {message.type === "text" && (
+                    <p className="text-sm">{message.content}</p>
+                  )}
+                  
+                  {message.type === "file" && (
+                    <div className="flex items-center gap-3 p-2 bg-background/10 rounded-lg">
+                      <Paperclip className="w-4 h-4" />
+                      <div>
+                        <p className="text-sm font-medium">{message.file_name}</p>
+                        <p className="text-xs opacity-70">{message.file_size ? formatFileSize(message.file_size) : 'File'}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {message.type === "image" && (
+                    <div>
+                      <Image
+                        src={message.image_url || "/placeholder.jpg"}
+                        alt={message.file_name || "Shared image"}
+                        width={200}
+                        height={150}
+                        className="rounded-lg mb-2"
+                      />
+                      <p className="text-xs opacity-70">{message.file_name}</p>
+                    </div>
+                  )}
+                  
+                  <p className={`text-xs mt-1 ${
+                    message.sender_id === user?.id 
+                      ? "text-primary-foreground/70" 
+                      : "text-muted-foreground"
+                  }`}>
+                    {formatTime(message.timestamp)}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
           <div ref={messagesEndRef} />
         </div>
 
@@ -344,7 +357,7 @@ export default function ChatPage() {
             />
             <button
               type="submit"
-              disabled={!newMessage.trim() && selectedFiles.length === 0}
+              disabled={(!newMessage.trim() && selectedFiles.length === 0) || !partnerId}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Send className="w-4 h-4" />

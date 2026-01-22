@@ -1,32 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Upload, Download, Plus, Trash2, Search, FileText, Users, AlertCircle } from "lucide-react"
-
-const mockWhitelist = [
-  { id: 1, email: "alex@example.com", track: "frontend", cohort: "cohort-1", addedDate: "2024-01-15", status: "active" },
-  { id: 2, email: "sarah@example.com", track: "backend", cohort: "cohort-2", addedDate: "2024-01-16", status: "active" },
-  { id: 3, email: "mike@example.com", track: "devops", cohort: "cohort-1", addedDate: "2024-01-17", status: "active" },
-  { id: 4, email: "emily@example.com", track: "web3", cohort: "cohort-2", addedDate: "2024-01-18", status: "pending" },
-  { id: 5, email: "jordan@example.com", track: "frontend", cohort: "cohort-1", addedDate: "2024-01-19", status: "active" },
-  { id: 6, email: "sam@example.com", track: "data", cohort: "cohort-2", addedDate: "2024-01-20", status: "active" }
-]
-
-const TRACKS = [
-  { id: "frontend", name: "Frontend Development" },
-  { id: "backend", name: "Backend Development" },
-  { id: "devops", name: "DevOps / Cloud" },
-  { id: "data", name: "Data / AI / ML" },
-  { id: "web3", name: "Web3" }
-]
-
-const COHORTS = [
-  { id: "cohort-1", name: "Cohort 1" },
-  { id: "cohort-2", name: "Cohort 2" },
-  { id: "cohort-3", name: "Cohort 3" }
-]
+import { useAuth } from "@/lib/hooks/useAuth"
+import { getPaidLearnerWhitelist, getTracks, getCohorts, addWhitelistEntry, bulkAddWhitelistEntries, removeWhitelistEntry } from "@/lib/data"
+import { useToast } from "@/components/ui/toast"
 
 export default function WhitelistPage() {
+  const { user, loading: authLoading } = useAuth()
+  const { showToast } = useToast()
+  const [whitelist, setWhitelist] = useState<any[]>([])
+  const [tracks, setTracks] = useState<any[]>([])
+  const [cohorts, setCohorts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterTrack, setFilterTrack] = useState("all")
   const [filterCohort, setFilterCohort] = useState("all")
@@ -34,9 +20,48 @@ export default function WhitelistPage() {
   const [showBulkUpload, setShowBulkUpload] = useState(false)
   const [newEntry, setNewEntry] = useState({ email: "", track: "", cohort: "" })
   const [bulkData, setBulkData] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [formLoading, setFormLoading] = useState(false)
 
-  const filteredWhitelist = mockWhitelist.filter(entry => {
+  useEffect(() => {
+    async function loadData() {
+      if (!user?.id) return
+      
+      try {
+        const [whitelistData, tracksData, cohortsData] = await Promise.all([
+          getPaidLearnerWhitelist(),
+          getTracks(),
+          getCohorts()
+        ])
+        
+        // Transform whitelist to match expected structure
+        const transformedWhitelist = whitelistData.map((entry: any) => ({
+          id: entry.id,
+          email: entry.email,
+          track: entry.track?.id || 'unknown',
+          cohort: entry.cohort?.id || 'unknown',
+          addedDate: entry.added_date,
+          status: entry.status
+        }))
+        
+        setWhitelist(transformedWhitelist)
+        setTracks(tracksData)
+        setCohorts(cohortsData)
+      } catch (error) {
+        console.error('Error loading whitelist data:', error)
+        setWhitelist([])
+        setTracks([])
+        setCohorts([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!authLoading && user) {
+      loadData()
+    }
+  }, [user, authLoading])
+
+  const filteredWhitelist = whitelist.filter(entry => {
     const matchesSearch = entry.email.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesTrack = filterTrack === "all" || entry.track === filterTrack
     const matchesCohort = filterCohort === "all" || entry.cohort === filterCohort
@@ -45,49 +70,147 @@ export default function WhitelistPage() {
 
   const handleAddEntry = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    console.log("Adding whitelist entry:", newEntry)
+    if (!newEntry.email || !newEntry.track || !newEntry.cohort) return
     
-    setNewEntry({ email: "", track: "", cohort: "" })
-    setShowAddForm(false)
-    setLoading(false)
+    setFormLoading(true)
+    try {
+      console.log('Form data:', newEntry)
+      console.log('Available tracks:', tracks)
+      console.log('Available cohorts:', cohorts)
+      
+      // Fix: Use the selected IDs directly instead of searching by name
+      const trackId = newEntry.track
+      const cohortId = newEntry.cohort
+      
+      console.log('Selected trackId:', trackId, 'cohortId:', cohortId)
+      
+      if (!trackId || !cohortId) {
+        showToast({
+          type: 'error',
+          title: 'Selection Required',
+          message: 'Please select both a track and cohort.'
+        })
+        return
+      }
+      
+      await addWhitelistEntry({
+        email: newEntry.email,
+        track_id: trackId,
+        cohort_id: cohortId
+      })
+      
+      showToast({
+        type: 'success',
+        title: 'Entry Added',
+        message: `${newEntry.email} has been added to the whitelist.`
+      })
+      
+      // Refresh whitelist
+      const updatedWhitelist = await getPaidLearnerWhitelist()
+      const transformedWhitelist = updatedWhitelist.map((entry: any) => ({
+        id: entry.id,
+        email: entry.email,
+        track: entry.track?.id || 'Unknown Track',
+        cohort: entry.cohort?.id || 'Unknown Cohort',
+        status: entry.status,
+        addedDate: entry.added_date
+      }))
+      setWhitelist(transformedWhitelist)
+      
+      setNewEntry({ email: "", track: "", cohort: "" })
+      setShowAddForm(false)
+    } catch (error) {
+      console.error('Error adding whitelist entry:', error)
+      showToast({
+        type: 'error',
+        title: 'Add Failed',
+        message: 'Failed to add whitelist entry. Please try again.'
+      })
+    } finally {
+      setFormLoading(false)
+    }
   }
 
   const handleBulkUpload = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-
-    // Parse CSV data
-    const lines = bulkData.trim().split('\n')
-    const entries = lines.slice(1).map(line => {
-      const [email, track, cohort] = line.split(',').map(s => s.trim())
-      return { email, track, cohort }
-    })
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    console.log("Bulk uploading entries:", entries)
+    if (!bulkData.trim()) return
     
-    setBulkData("")
-    setShowBulkUpload(false)
-    setLoading(false)
+    setFormLoading(true)
+    try {
+      // Parse CSV data
+      const lines = bulkData.trim().split('\n')
+      const entries = lines.slice(1).map(line => {
+        const [email, trackName, cohortName] = line.split(',').map(s => s.trim())
+        const trackId = tracks.find(t => t.name === trackName)?.id
+        const cohortId = cohorts.find(c => c.name === cohortName)?.id
+        return { email, track_id: trackId, cohort_id: cohortId }
+      }).filter(entry => entry.track_id && entry.cohort_id)
+
+      await bulkAddWhitelistEntries(entries)
+      
+      showToast({
+        type: 'success',
+        title: 'Bulk Upload Complete',
+        message: `${entries.length} entries have been added to the whitelist.`
+      })
+      
+      // Refresh whitelist
+      const updatedWhitelist = await getPaidLearnerWhitelist()
+      const transformedWhitelist = updatedWhitelist.map((entry: any) => ({
+        id: entry.id,
+        email: entry.email,
+        track: entry.track?.name || 'Unknown Track',
+        cohort: entry.cohort?.name || 'Unknown Cohort',
+        status: entry.status,
+        addedDate: entry.added_date
+      }))
+      setWhitelist(transformedWhitelist)
+      
+      setBulkData("")
+      setShowBulkUpload(false)
+    } catch (error) {
+      console.error('Error bulk uploading entries:', error)
+      showToast({
+        type: 'error',
+        title: 'Bulk Upload Failed',
+        message: 'Failed to bulk upload entries. Please try again.'
+      })
+    } finally {
+      setFormLoading(false)
+    }
   }
 
-  const handleRemoveEntry = async (id: number) => {
-    if (confirm("Are you sure you want to remove this entry from the whitelist?")) {
-      console.log("Removing entry:", id)
+  const handleRemoveEntry = async (id: string) => {
+    if (!confirm("Are you sure you want to remove this entry from the whitelist?")) {
+      return
     }
+
+    try {
+      await removeWhitelistEntry(id)
+      
+      // Update local state
+      setWhitelist(prev => prev.filter(entry => entry.id !== id))
+      
+      showToast({
+        type: 'success',
+        title: 'Entry Removed',
+        message: 'Whitelist entry has been removed successfully.'
+      })
+    } catch (error: any) {
+      console.error('Error removing entry:', error)
+      showToast({
+        type: 'error',
+        title: 'Remove Failed',
+        message: error.message || 'Failed to remove whitelist entry. Please try again.'
+      })
+    }
+  }
   }
 
   const exportWhitelist = () => {
     const csvContent = [
       "Email,Track,Cohort,Added Date,Status",
-      ...mockWhitelist.map(entry => 
+      ...whitelist.map(entry => 
         `${entry.email},${entry.track},${entry.cohort},${entry.addedDate},${entry.status}`
       )
     ].join('\n')
@@ -99,6 +222,22 @@ export default function WhitelistPage() {
     a.download = 'paid-learners-whitelist.csv'
     a.click()
     window.URL.revokeObjectURL(url)
+  }
+
+  if (authLoading || loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-7xl">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+          <div className="space-y-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-16 bg-muted rounded-xl"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -141,7 +280,7 @@ export default function WhitelistPage() {
             <div className="flex items-center gap-3">
               <Users className="w-8 h-8 text-primary" />
               <div>
-                <p className="text-2xl font-bold">{mockWhitelist.length}</p>
+                <p className="text-2xl font-bold">{whitelist.length}</p>
                 <p className="text-sm text-foreground/60">Total Entries</p>
               </div>
             </div>
@@ -150,7 +289,7 @@ export default function WhitelistPage() {
             <div className="flex items-center gap-3">
               <FileText className="w-8 h-8 text-green-500" />
               <div>
-                <p className="text-2xl font-bold">{mockWhitelist.filter(e => e.status === "active").length}</p>
+                <p className="text-2xl font-bold">{whitelist.filter(e => e.status === "active").length}</p>
                 <p className="text-sm text-foreground/60">Active</p>
               </div>
             </div>
@@ -159,7 +298,7 @@ export default function WhitelistPage() {
             <div className="flex items-center gap-3">
               <AlertCircle className="w-8 h-8 text-yellow-500" />
               <div>
-                <p className="text-2xl font-bold">{mockWhitelist.filter(e => e.status === "pending").length}</p>
+                <p className="text-2xl font-bold">{whitelist.filter(e => e.status === "pending").length}</p>
                 <p className="text-sm text-foreground/60">Pending</p>
               </div>
             </div>
@@ -168,7 +307,7 @@ export default function WhitelistPage() {
             <div className="flex items-center gap-3">
               <Users className="w-8 h-8 text-secondary" />
               <div>
-                <p className="text-2xl font-bold">{new Set(mockWhitelist.map(e => e.track)).size}</p>
+                <p className="text-2xl font-bold">{new Set(whitelist.map(e => e.track)).size}</p>
                 <p className="text-sm text-foreground/60">Tracks</p>
               </div>
             </div>
@@ -197,7 +336,7 @@ export default function WhitelistPage() {
             className="px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="all">All Tracks</option>
-            {TRACKS.map(track => (
+            {tracks.map(track => (
               <option key={track.id} value={track.id}>{track.name}</option>
             ))}
           </select>
@@ -207,7 +346,7 @@ export default function WhitelistPage() {
             className="px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="all">All Cohorts</option>
-            {COHORTS.map(cohort => (
+            {cohorts.map(cohort => (
               <option key={cohort.id} value={cohort.id}>{cohort.name}</option>
             ))}
           </select>
@@ -234,12 +373,12 @@ export default function WhitelistPage() {
                   <td className="p-4 font-medium">{entry.email}</td>
                   <td className="p-4">
                     <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-sm">
-                      {TRACKS.find(t => t.id === entry.track)?.name}
+                      {tracks.find(t => t.id === entry.track)?.name || entry.track}
                     </span>
                   </td>
                   <td className="p-4">
                     <span className="px-2 py-1 bg-secondary/10 text-secondary rounded-full text-sm">
-                      {COHORTS.find(c => c.id === entry.cohort)?.name}
+                      {cohorts.find(c => c.id === entry.cohort)?.name || entry.cohort}
                     </span>
                   </td>
                   <td className="p-4 text-foreground/70">
@@ -297,7 +436,7 @@ export default function WhitelistPage() {
                   required
                 >
                   <option value="">Select a track</option>
-                  {TRACKS.map(track => (
+                  {tracks.map(track => (
                     <option key={track.id} value={track.id}>{track.name}</option>
                   ))}
                 </select>
@@ -312,7 +451,7 @@ export default function WhitelistPage() {
                   required
                 >
                   <option value="">Select a cohort</option>
-                  {COHORTS.map(cohort => (
+                  {cohorts.map(cohort => (
                     <option key={cohort.id} value={cohort.id}>{cohort.name}</option>
                   ))}
                 </select>
@@ -331,7 +470,7 @@ export default function WhitelistPage() {
                   disabled={loading}
                   className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
-                  {loading ? "Adding..." : "Add Entry"}
+                  {formLoading ? "Adding..." : "Add Entry"}
                 </button>
               </div>
             </form>
@@ -379,7 +518,7 @@ export default function WhitelistPage() {
                   disabled={loading}
                   className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
-                  {loading ? "Uploading..." : "Upload Entries"}
+                  {formLoading ? "Uploading..." : "Upload Entries"}
                 </button>
               </div>
             </form>

@@ -20,6 +20,7 @@ import {
   UserCheck,
   Phone,
 } from "lucide-react"
+import { NotificationBell } from "@/components/notifications"
 
 export default function AdminLayout({
   children,
@@ -35,6 +36,7 @@ export default function AdminLayout({
     { href: "/admin/students", label: "Students", icon: Users },
     { href: "/admin/tracks", label: "Tracks & Tasks", icon: CheckSquare },
     { href: "/admin/weeks", label: "Weeks & Lessons", icon: Calendar },
+    { href: "/admin/cohorts", label: "Cohorts", icon: Users },
     { href: "/admin/submissions", label: "Submissions", icon: BarChart3 },
     { href: "/admin/clarity-calls", label: "Clarity Calls", icon: Phone },
     { href: "/admin/certificates", label: "Certificates", icon: Certificate },
@@ -71,7 +73,7 @@ export default function AdminLayout({
             <span className="font-bold text-lg">ENG-Basecamp</span>
           </Link>
           
-          <div className="w-10"></div> {/* Spacer for centering */}
+          <NotificationBell />
         </div>
       </header>
 

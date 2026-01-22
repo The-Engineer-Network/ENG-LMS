@@ -1,91 +1,77 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { CheckCircle2, Lock, Clock, Play, FileText, MessageSquare } from "lucide-react"
-
-const mockWeeks = [
-  {
-    id: 1,
-    title: "React Fundamentals",
-    description: "Learn core React concepts including components, JSX, and hooks",
-    status: "completed",
-    locked: false,
-    lessons: 4,
-    assignment: {
-      submitted: true,
-      approved: true,
-      deadline: "2024-02-15"
-    }
-  },
-  {
-    id: 2,
-    title: "State Management",
-    description: "Master state management with Context API and custom hooks",
-    status: "completed",
-    locked: false,
-    lessons: 5,
-    assignment: {
-      submitted: true,
-      approved: true,
-      deadline: "2024-02-22"
-    }
-  },
-  {
-    id: 3,
-    title: "Component Composition",
-    description: "Build reusable components and understand composition patterns",
-    status: "current",
-    locked: false,
-    lessons: 6,
-    assignment: {
-      submitted: false,
-      approved: false,
-      deadline: "2024-03-01"
-    }
-  },
-  {
-    id: 4,
-    title: "API Integration",
-    description: "Connect to REST APIs and handle async operations",
-    status: "locked",
-    locked: true,
-    lessons: 5,
-    assignment: {
-      submitted: false,
-      approved: false,
-      deadline: "2024-03-08"
-    }
-  },
-  {
-    id: 5,
-    title: "Testing & Performance",
-    description: "Write tests and optimize React applications",
-    status: "locked",
-    locked: true,
-    lessons: 4,
-    assignment: {
-      submitted: false,
-      approved: false,
-      deadline: "2024-03-15"
-    }
-  },
-  {
-    id: 6,
-    title: "Deployment & Production",
-    description: "Deploy applications and production best practices",
-    status: "locked",
-    locked: true,
-    lessons: 3,
-    assignment: {
-      submitted: false,
-      approved: false,
-      deadline: "2024-03-22"
-    }
-  }
-]
+import { CheckCircle2, Lock, Clock, Play, FileText } from "lucide-react"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { getStudentEnrollment, getWeeksByTrack, getStudentWeekProgress } from "@/lib/data"
 
 export default function WeeksPage() {
+  const { user, loading: authLoading } = useAuth()
+  const [weeks, setWeeks] = useState<any[]>([])
+  const [enrollment, setEnrollment] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadWeeksData() {
+      if (!user?.id) return
+      
+      try {
+        const enrollmentData = await getStudentEnrollment(user.id)
+        if (!enrollmentData) return
+        
+        setEnrollment(enrollmentData)
+        
+        const weeksData = await getWeeksByTrack(enrollmentData.track_id)
+        const progressData = await getStudentWeekProgress(user.id)
+        
+        // Transform weeks to match the expected structure
+        const mockWeeks = weeksData.map((week: any, index: number) => {
+          const progress = progressData.find((p: any) => p.week_id === week.id)
+          const isLocked = index > 0 && !progressData.find((p: any) => 
+            p.week_id === weeksData[index - 1].id && p.status === 'approved'
+          )
+          
+          let status = 'locked'
+          if (!isLocked) {
+            if (progress?.status === 'approved') {
+              status = 'completed'
+            } else if (progress?.status === 'pending') {
+              status = 'current'
+            } else {
+              status = 'current'
+            }
+          }
+          
+          return {
+            id: week.id,
+            title: week.title,
+            description: week.description,
+            status,
+            locked: isLocked,
+            lessons: week.lessons?.length || 0,
+            assignment: {
+              submitted: !!progress?.submitted_at,
+              approved: progress?.status === 'approved',
+              deadline: week.assignments?.[0]?.deadline || new Date().toISOString().split('T')[0]
+            }
+          }
+        })
+        
+        setWeeks(mockWeeks)
+      } catch (error) {
+        console.error('Error loading weeks data:', error)
+        setWeeks([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!authLoading && user) {
+      loadWeeksData()
+    }
+  }, [user, authLoading])
+
   const getStatusIcon = (status: string, locked: boolean) => {
     if (locked) return <Lock className="w-5 h-5 text-muted-foreground" />
     if (status === "completed") return <CheckCircle2 className="w-5 h-5 text-primary" />
@@ -100,29 +86,50 @@ export default function WeeksPage() {
     return "border-muted bg-muted/20"
   }
 
+  const completedWeeks = weeks.filter(w => w.status === 'completed').length
+  const progressPercentage = weeks.length > 0 ? Math.round((completedWeeks / weeks.length) * 100) : 0
+
+  if (authLoading || loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-4xl mx-auto">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-32 bg-muted rounded-xl"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-6 md:mb-8 animate-slideInUp">
         <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2">Program Weeks</h1>
-        <p className="text-foreground/60 text-sm md:text-base">Frontend Development Track - 6 Week Program</p>
+        <p className="text-foreground/60 text-sm md:text-base">
+          {enrollment?.track?.name || 'Development'} Track - {weeks.length} Week Program
+        </p>
       </div>
 
       {/* Progress Overview */}
       <div className="mb-6 md:mb-8 p-4 md:p-6 rounded-xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg md:text-xl font-semibold">Overall Progress</h2>
-          <span className="text-xl md:text-2xl font-bold text-primary">33%</span>
+          <span className="text-xl md:text-2xl font-bold text-primary">{progressPercentage}%</span>
         </div>
         <div className="w-full bg-muted rounded-full h-2 md:h-3">
-          <div className="bg-gradient-to-r from-primary to-secondary h-2 md:h-3 rounded-full transition-all duration-500" style={{ width: "33%" }}></div>
+          <div className="bg-gradient-to-r from-primary to-secondary h-2 md:h-3 rounded-full transition-all duration-500" style={{ width: `${progressPercentage}%` }}></div>
         </div>
-        <p className="text-xs md:text-sm text-foreground/60 mt-2">2 of 6 weeks completed</p>
+        <p className="text-xs md:text-sm text-foreground/60 mt-2">{completedWeeks} of {weeks.length} weeks completed</p>
       </div>
 
       {/* Weeks Grid */}
       <div className="space-y-4">
-        {mockWeeks.map((week) => (
+        {weeks.map((week) => (
           <div
             key={week.id}
             className={`p-4 md:p-6 rounded-xl border transition-all duration-200 ${getStatusColor(week.status, week.locked)} ${

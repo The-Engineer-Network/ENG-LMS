@@ -1,0 +1,12 @@
+-- Re-enable RLS after testing (run this after testing admin functions)
+
+ALTER TABLE tracks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cohorts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE weeks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lessons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_enrollments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE paid_learner_whitelist ENABLE ROW LEVEL SECURITY;
+
+SELECT 'RLS RE-ENABLED - Security restored' as status;

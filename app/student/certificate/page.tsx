@@ -1,24 +1,105 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Download, Lock, Award, CheckCircle2 } from "lucide-react"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { getStudentCertificate } from "@/lib/data"
+import { downloadCertificateFile } from "@/lib/storage"
 
 export default function CertificatePage() {
-  // Mock data - in real app, this would come from API
-  const certificateData = {
-    isApproved: false, // Change to true to test approved state
-    studentName: "Shalom Alalade",
-    track: "Frontend Development",
-    cohort: "Cohort 1",
-    completionDate: "February 28, 2024",
-    certificateFile: "shalom-alalade-certificate.pdf",
-    tasksCompleted: 17,
-    totalTasks: 20
+  const { user, loading: authLoading } = useAuth()
+  const [certificate, setCertificate] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadCertificate() {
+      if (!user?.id) return
+      
+      try {
+        const certificateData = await getStudentCertificate(user.id)
+        if (certificateData) {
+          // Transform to match expected structure
+          const mockCertificateData = {
+            isApproved: certificateData.is_approved,
+            studentName: certificateData.student?.full_name || user.email?.split('@')[0] || 'Student',
+            track: certificateData.track?.name || 'Development',
+            cohort: certificateData.cohort?.name || 'Cohort 1',
+            completionDate: certificateData.completion_date || new Date().toISOString().split('T')[0],
+            certificateFile: certificateData.certificate_file || 'certificate.pdf',
+            tasksCompleted: certificateData.tasks_completed || 0,
+            totalTasks: certificateData.total_tasks || 20
+          }
+          setCertificate(mockCertificateData)
+        } else {
+          // No certificate found, create default structure
+          setCertificate({
+            isApproved: false,
+            studentName: user.email?.split('@')[0] || 'Student',
+            track: 'Development',
+            cohort: 'Cohort 1',
+            completionDate: new Date().toISOString().split('T')[0],
+            certificateFile: 'certificate.pdf',
+            tasksCompleted: 17,
+            totalTasks: 20
+          })
+        }
+      } catch (error) {
+        console.error('Error loading certificate:', error)
+        // Set default data on error
+        setCertificate({
+          isApproved: false,
+          studentName: user?.email?.split('@')[0] || 'Student',
+          track: 'Development',
+          cohort: 'Cohort 1',
+          completionDate: new Date().toISOString().split('T')[0],
+          certificateFile: 'certificate.pdf',
+          tasksCompleted: 17,
+          totalTasks: 20
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!authLoading && user) {
+      loadCertificate()
+    }
+  }, [user, authLoading])
+
+  const handleDownload = async () => {
+    if (certificate?.certificateFile) {
+      try {
+        await downloadCertificateFile(certificate.certificateFile, `${certificate.student.name}-certificate.pdf`)
+      } catch (error) {
+        console.error('Error downloading certificate:', error)
+      }
+    }
   }
 
-  const handleDownload = () => {
-    console.log("Downloading certificate:", certificateData.certificateFile)
-    // TODO: Implement actual file download
+  if (authLoading || loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-4xl">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+          <div className="h-96 bg-muted rounded-xl"></div>
+        </div>
+      </div>
+    )
   }
+
+  if (!certificate) {
+    return (
+      <div className="p-4 md:p-8 max-w-4xl">
+        <div className="text-center py-12">
+          <h2 className="text-xl font-semibold mb-2">Certificate not available</h2>
+          <p className="text-foreground/60">Unable to load certificate information.</p>
+        </div>
+      </div>
+    )
+  }
+
+  const certificateData = certificate
 
   return (
     <div className="p-4 md:p-8 max-w-4xl">
@@ -64,7 +145,7 @@ export default function CertificatePage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-foreground/60">Completion Date:</span>
-                  <span className="font-medium">{certificateData.completionDate}</span>
+                  <span className="font-medium">{new Date(certificateData.completionDate).toLocaleDateString()}</span>
                 </div>
               </div>
             </div>

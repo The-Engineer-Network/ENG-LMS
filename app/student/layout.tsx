@@ -6,6 +6,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { GraduationCap, LayoutDashboard, CheckSquare, MessageSquare, Award, User, LogOut, Menu, X, Calendar, Phone } from "lucide-react"
+import { NotificationBell } from "@/components/notifications"
 
 export default function StudentLayout({
   children,
@@ -59,7 +60,7 @@ export default function StudentLayout({
             <span className="font-bold text-lg">ENG-Basecamp</span>
           </Link>
           
-          <div className="w-10"></div> {/* Spacer for centering */}
+          <NotificationBell />
         </div>
       </header>
 

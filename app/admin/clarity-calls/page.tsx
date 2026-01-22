@@ -1,79 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Calendar, Clock, MessageSquare, User, CheckCircle2, AlertCircle, ExternalLink, Filter } from "lucide-react"
-
-const mockClarityRequests = [
-  {
-    id: 1,
-    studentName: "Alex Johnson",
-    studentEmail: "alex@example.com",
-    track: "Frontend",
-    cohort: "Cohort 1",
-    topic: "Understanding React Hooks",
-    week: 1,
-    weekTitle: "React Fundamentals",
-    preferredDate: "2024-02-20",
-    preferredTime: "14:00",
-    status: "scheduled",
-    scheduledDate: "2024-02-20T14:00:00Z",
-    meetingLink: "https://meet.google.com/abc-defg-hij",
-    notes: "I'm having trouble understanding useEffect dependencies and when to use cleanup functions.",
-    createdAt: "2024-02-15T10:30:00Z",
-    mentorNotes: "Scheduled for Tuesday afternoon. Will cover useEffect patterns and cleanup functions."
-  },
-  {
-    id: 2,
-    studentName: "Sarah Chen",
-    studentEmail: "sarah@example.com",
-    track: "Frontend",
-    cohort: "Cohort 1",
-    topic: "State Management Best Practices",
-    week: 2,
-    weekTitle: "State Management",
-    preferredDate: "2024-02-25",
-    preferredTime: "15:30",
-    status: "pending",
-    notes: "Need clarification on when to use Context vs local state vs external state management.",
-    createdAt: "2024-02-22T09:15:00Z"
-  },
-  {
-    id: 3,
-    studentName: "Mike Rodriguez",
-    studentEmail: "mike@example.com",
-    track: "Backend",
-    cohort: "Cohort 2",
-    topic: "Database Design Patterns",
-    week: 3,
-    weekTitle: "Database Architecture",
-    preferredDate: "2024-02-28",
-    preferredTime: "16:00",
-    status: "completed",
-    scheduledDate: "2024-02-26T16:00:00Z",
-    notes: "Questions about normalization vs denormalization and when to use each approach.",
-    createdAt: "2024-02-23T11:45:00Z",
-    mentorNotes: "Great session! Student understood the concepts well.",
-    feedback: "Very helpful session. The examples really clarified the differences between approaches."
-  },
-  {
-    id: 4,
-    studentName: "Emily Davis",
-    studentEmail: "emily@example.com",
-    track: "DevOps",
-    cohort: "Cohort 1",
-    topic: "CI/CD Pipeline Setup",
-    week: 4,
-    weekTitle: "Deployment Automation",
-    preferredDate: "2024-03-05",
-    preferredTime: "10:00",
-    status: "rejected",
-    notes: "Need help setting up GitHub Actions for automated deployment.",
-    createdAt: "2024-02-28T14:20:00Z",
-    mentorNotes: "Request rejected - topic will be covered in upcoming group session."
-  }
-]
+import { useAuth } from "@/lib/hooks/useAuth"
+import { getAllClarityRequests, updateClarityCallRequest } from "@/lib/data"
 
 export default function AdminClarityCallsPage() {
+  const { user, loading: authLoading } = useAuth()
+  const [requests, setRequests] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterTrack, setFilterTrack] = useState("all")
   const [selectedRequest, setSelectedRequest] = useState<any>(null)
@@ -85,7 +20,49 @@ export default function AdminClarityCallsPage() {
     mentorNotes: ""
   })
 
-  const filteredRequests = mockClarityRequests.filter(request => {
+  useEffect(() => {
+    async function loadRequests() {
+      if (!user?.id) return
+      
+      try {
+        const requestsData = await getAllClarityRequests()
+        
+        // Transform requests to match expected structure
+        const transformedRequests = requestsData.map((request: any) => ({
+          id: request.id,
+          studentName: request.student?.full_name || 'Unknown Student',
+          studentEmail: request.student?.email || 'No email',
+          track: 'Unknown Track', // TODO: Get from student enrollment
+          cohort: 'Unknown Cohort', // TODO: Get from student enrollment
+          topic: request.topic,
+          week: request.week?.week_number || 0,
+          weekTitle: request.week?.title || 'Unknown Week',
+          preferredDate: request.preferred_date?.split('T')[0] || '',
+          preferredTime: request.preferred_time || '',
+          status: request.status,
+          scheduledDate: request.scheduled_date,
+          meetingLink: request.meeting_link,
+          notes: request.notes,
+          createdAt: request.created_at,
+          mentorNotes: request.mentor_notes,
+          feedback: request.feedback
+        }))
+        
+        setRequests(transformedRequests)
+      } catch (error) {
+        console.error('Error loading clarity requests:', error)
+        setRequests([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!authLoading && user) {
+      loadRequests()
+    }
+  }, [user, authLoading])
+
+  const filteredRequests = requests.filter(request => {
     const matchesStatus = filterStatus === "all" || request.status === filterStatus
     const matchesTrack = filterTrack === "all" || request.track.toLowerCase() === filterTrack
     return matchesStatus && matchesTrack
@@ -134,32 +111,101 @@ export default function AdminClarityCallsPage() {
 
   const handleScheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Scheduling clarity call:", {
-      requestId: selectedRequest.id,
-      ...scheduleForm
-    })
+    if (!selectedRequest || !user?.id) return
     
-    setShowScheduleModal(false)
-    setSelectedRequest(null)
-    setScheduleForm({ date: "", time: "", meetingLink: "", mentorNotes: "" })
+    try {
+      const scheduledDateTime = new Date(`${scheduleForm.date}T${scheduleForm.time}:00Z`).toISOString()
+      
+      await updateClarityCallRequest(selectedRequest.id, {
+        status: 'scheduled',
+        scheduled_date: scheduledDateTime,
+        meeting_link: scheduleForm.meetingLink,
+        mentor_notes: scheduleForm.mentorNotes
+      })
+      
+      // Update local state
+      setRequests(prev => prev.map(req => 
+        req.id === selectedRequest.id 
+          ? { 
+              ...req, 
+              status: 'scheduled',
+              scheduledDate: scheduledDateTime,
+              meetingLink: scheduleForm.meetingLink,
+              mentorNotes: scheduleForm.mentorNotes
+            }
+          : req
+      ))
+      
+      setShowScheduleModal(false)
+      setSelectedRequest(null)
+      setScheduleForm({ date: "", time: "", meetingLink: "", mentorNotes: "" })
+    } catch (error) {
+      console.error('Error scheduling clarity call:', error)
+      alert('Failed to schedule clarity call')
+    }
   }
 
   const handleReject = async (requestId: number) => {
     if (confirm("Are you sure you want to reject this clarity call request?")) {
-      console.log("Rejecting request:", requestId)
+      try {
+        await updateClarityCallRequest(requestId.toString(), {
+          status: 'rejected',
+          mentor_notes: 'Request rejected by admin'
+        })
+        
+        // Update local state
+        setRequests(prev => prev.map(req => 
+          req.id === requestId 
+            ? { ...req, status: 'rejected' }
+            : req
+        ))
+      } catch (error) {
+        console.error('Error rejecting request:', error)
+        alert('Failed to reject request')
+      }
     }
   }
 
   const handleComplete = async (requestId: number) => {
-    console.log("Marking request as completed:", requestId)
+    try {
+      await updateClarityCallRequest(requestId.toString(), {
+        status: 'completed'
+      })
+      
+      // Update local state
+      setRequests(prev => prev.map(req => 
+        req.id === requestId 
+          ? { ...req, status: 'completed' }
+          : req
+      ))
+    } catch (error) {
+      console.error('Error completing request:', error)
+      alert('Failed to mark request as completed')
+    }
   }
 
   const statusCounts = {
-    all: mockClarityRequests.length,
-    pending: mockClarityRequests.filter(r => r.status === "pending").length,
-    scheduled: mockClarityRequests.filter(r => r.status === "scheduled").length,
-    completed: mockClarityRequests.filter(r => r.status === "completed").length,
-    rejected: mockClarityRequests.filter(r => r.status === "rejected").length
+    all: requests.length,
+    pending: requests.filter(r => r.status === "pending").length,
+    scheduled: requests.filter(r => r.status === "scheduled").length,
+    completed: requests.filter(r => r.status === "completed").length,
+    rejected: requests.filter(r => r.status === "rejected").length
+  }
+
+  if (authLoading || loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-7xl">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+          <div className="space-y-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-muted rounded-xl"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

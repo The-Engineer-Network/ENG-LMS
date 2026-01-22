@@ -1,0 +1,13 @@
+-- Temporarily disable RLS for testing admin functions
+-- IMPORTANT: This is for testing only - re-enable RLS after testing
+
+ALTER TABLE tracks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE cohorts DISABLE ROW LEVEL SECURITY;
+ALTER TABLE weeks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE lessons DISABLE ROW LEVEL SECURITY;
+ALTER TABLE assignments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE student_enrollments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_settings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE paid_learner_whitelist DISABLE ROW LEVEL SECURITY;
+
+SELECT 'RLS TEMPORARILY DISABLED - Test admin functions now' as status;

@@ -1,62 +1,56 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { CheckCircle2, Lock, Download, Upload, Trash2 } from "lucide-react"
-
-const mockCertificates = [
-  { 
-    id: 1, 
-    student: "Alex Johnson", 
-    email: "alex@example.com",
-    track: "Frontend", 
-    status: "Ready for Upload", 
-    tasksCompleted: 20,
-    totalTasks: 20
-  },
-  { 
-    id: 2, 
-    student: "Sarah Chen", 
-    email: "sarah@example.com",
-    track: "Backend", 
-    status: "Pending", 
-    tasksCompleted: 19,
-    totalTasks: 20
-  },
-  { 
-    id: 3, 
-    student: "Mike Johnson", 
-    email: "mike@example.com",
-    track: "DevOps", 
-    status: "Ready for Upload", 
-    tasksCompleted: 20,
-    totalTasks: 20
-  },
-  { 
-    id: 4, 
-    student: "Emily Davis", 
-    email: "emily@example.com",
-    track: "Web3", 
-    status: "Ready for Upload", 
-    tasksCompleted: 20,
-    totalTasks: 20
-  },
-  { 
-    id: 5, 
-    student: "Jordan Smith", 
-    email: "jordan@example.com",
-    track: "Frontend", 
-    status: "Pending", 
-    tasksCompleted: 17,
-    totalTasks: 20
-  },
-]
+import { useAuth } from "@/lib/hooks/useAuth"
+import { useToast } from "@/components/ui/toast"
+import { getAllCertificates, uploadCertificateFile, deleteCertificate } from "@/lib/data"
 
 export default function CertificatesPage() {
+  const { user, loading: authLoading } = useAuth()
+  const { showToast } = useToast()
+  const [certificates, setCertificates] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>("all")
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
 
-  const filteredCerts = mockCertificates.filter(
+  useEffect(() => {
+    async function loadCertificates() {
+      if (!user?.id) return
+      
+      try {
+        const certificatesData = await getAllCertificates()
+        
+        // Transform certificates to match expected structure
+        const transformedCertificates = certificatesData.map((cert: any) => ({
+          id: cert.id,
+          student: cert.student?.full_name || 'Unknown Student',
+          email: cert.student?.email || 'No email',
+          track: cert.track?.name || 'Unknown Track',
+          status: cert.is_approved ? "Approved" : (cert.tasks_completed >= cert.total_tasks ? "Ready for Upload" : "Pending"),
+          tasksCompleted: cert.tasks_completed || 0,
+          totalTasks: cert.total_tasks || 20,
+          certificateFile: cert.certificate_file,
+          completionDate: cert.completion_date,
+          approvedAt: cert.approved_at
+        }))
+        
+        setCertificates(transformedCertificates)
+      } catch (error) {
+        console.error('Error loading certificates:', error)
+        setCertificates([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!authLoading && user) {
+      loadCertificates()
+    }
+  }, [user, authLoading])
+
+  const filteredCerts = certificates.filter(
     (cert) => filter === "all" || cert.status.toLowerCase() === filter.toLowerCase(),
   )
 
@@ -65,17 +59,60 @@ export default function CertificatesPage() {
     setShowUploadModal(true)
   }
 
-  const handleDeleteCertificate = (studentId: number) => {
-    console.log("Delete certificate for student:", studentId)
-    // TODO: Implement delete functionality
+  const handleDeleteCertificate = async (certificateId: string) => {
+    if (!confirm('Are you sure you want to delete this certificate? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await deleteCertificate(certificateId)
+      
+      // Update local state
+      setCertificates(prev => prev.filter(cert => cert.id !== certificateId))
+      
+      showToast({
+        type: 'success',
+        title: 'Certificate Deleted',
+        message: 'The certificate has been successfully deleted.'
+      })
+    } catch (error: any) {
+      console.error('Error deleting certificate:', error)
+      showToast({
+        type: 'error',
+        title: 'Delete Failed',
+        message: error.message || 'Failed to delete certificate. Please try again.'
+      })
+    }
   }
 
-  const handleFileUpload = (e: React.FormEvent) => {
+  const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Upload certificate for:", selectedStudent)
-    setShowUploadModal(false)
-    setSelectedStudent(null)
-    // TODO: Implement file upload functionality
+    if (!selectedStudent) return
+    
+    const formData = new FormData(e.target as HTMLFormElement)
+    const file = formData.get('certificate') as File
+    
+    if (!file) {
+      alert('Please select a certificate file')
+      return
+    }
+    
+    try {
+      await uploadCertificateFile(selectedStudent.id, file)
+      
+      // Update local state
+      setCertificates(prev => prev.map(cert => 
+        cert.id === selectedStudent.id 
+          ? { ...cert, status: 'Approved', certificateFile: 'uploaded' }
+          : cert
+      ))
+      
+      setShowUploadModal(false)
+      setSelectedStudent(null)
+    } catch (error) {
+      console.error('Error uploading certificate:', error)
+      alert('Failed to upload certificate')
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -96,6 +133,22 @@ export default function CertificatesPage() {
       default:
         return <Lock className="w-6 h-6 text-accent" />
     }
+  }
+
+  if (authLoading || loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-7xl">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-20 bg-muted rounded-xl"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -190,6 +243,7 @@ export default function CertificatesPage() {
               <div>
                 <label className="block font-medium mb-2">Certificate File *</label>
                 <input
+                  name="certificate"
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
                   className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"

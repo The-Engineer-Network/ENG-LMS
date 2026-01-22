@@ -1,330 +1,298 @@
 "use client"
 
-import { useState } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Plus, Trash2, ExternalLink, Clock, AlertCircle } from "lucide-react"
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { useParams } from "next/navigation"
+import { ArrowLeft, Calendar, Clock, FileText, Send, CheckCircle2 } from "lucide-react"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { getAssignmentById, getStudentSubmissionForAssignment } from "@/lib/data"
 
-const mockAssignments = {
-  1: {
-    id: 1,
-    title: "Build a Counter Component",
-    description: "Create a React component that implements a counter with increment, decrement, and reset functionality. The component should demonstrate proper state management and event handling.",
-    weekId: 1,
-    weekTitle: "React Fundamentals",
-    deadline: "2024-02-15T23:59:00Z",
-    requirements: [
-      { field: "github", label: "GitHub Repository", required: true, type: "url", placeholder: "https://github.com/username/project" },
-      { field: "demo", label: "Live Demo URL", required: true, type: "url", placeholder: "https://your-demo.vercel.app" },
-      { field: "notes", label: "Additional Notes", required: false, type: "textarea", placeholder: "Any additional comments about your implementation..." }
-    ],
-    guidelines: [
-      "Use functional components with hooks",
-      "Implement increment, decrement, and reset functionality",
-      "Add proper styling with CSS or Tailwind",
-      "Include a README with setup instructions",
-      "Deploy to Vercel, Netlify, or similar platform"
-    ],
-    submitted: true,
-    submission: {
-      github: "https://github.com/student/react-counter",
-      demo: "https://react-counter-demo.vercel.app",
-      notes: "Implemented with TypeScript and added bonus features like step increment"
-    }
-  },
-  2: {
-    id: 2,
-    title: "Theme Context Provider",
-    description: "Build a theme context provider that manages light/dark mode across the application. Implement theme switching with proper state persistence.",
-    weekId: 2,
-    weekTitle: "State Management",
-    deadline: "2024-02-22T23:59:00Z",
-    requirements: [
-      { field: "github", label: "GitHub Repository", required: true, type: "url", placeholder: "https://github.com/username/theme-provider" },
-      { field: "demo", label: "Live Demo URL", required: true, type: "url", placeholder: "https://your-theme-demo.vercel.app" }
-    ],
-    guidelines: [
-      "Create a ThemeContext using React Context API",
-      "Implement theme persistence with localStorage",
-      "Create a custom useTheme hook",
-      "Style both light and dark themes",
-      "Add smooth transitions between themes"
-    ],
-    submitted: true,
-    submission: {
-      github: "https://github.com/student/theme-provider",
-      demo: "https://theme-provider-demo.vercel.app"
-    }
-  },
-  3: {
-    id: 3,
-    title: "Reusable Modal Component",
-    description: "Create a flexible modal component using composition patterns. The modal should be reusable and support different content types.",
-    weekId: 3,
-    weekTitle: "Component Composition",
-    deadline: "2024-03-01T23:59:00Z",
-    requirements: [
-      { field: "github", label: "GitHub Repository", required: true, type: "url", placeholder: "https://github.com/username/modal-component" },
-      { field: "demo", label: "Live Demo URL", required: true, type: "url", placeholder: "https://your-modal-demo.vercel.app" },
-      { field: "notes", label: "Implementation Notes", required: false, type: "textarea", placeholder: "Explain your design decisions and any challenges faced..." }
-    ],
-    guidelines: [
-      "Use compound component pattern",
-      "Implement proper focus management",
-      "Add keyboard navigation (ESC to close)",
-      "Support different modal sizes",
-      "Include backdrop click to close"
-    ],
-    submitted: false,
-    submission: null
-  }
-}
-
-export default function TaskSubmissionPage() {
+export default function TaskDetailPage() {
+  const { user, loading: authLoading } = useAuth()
   const params = useParams()
-  const router = useRouter()
-  const taskId = parseInt(params.id as string)
-  const [formData, setFormData] = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState(false)
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const taskId = params.id as string
+  
+  const [assignment, setAssignment] = useState<any>(null)
+  const [submission, setSubmission] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  const assignment = mockAssignments[taskId as keyof typeof mockAssignments]
+  useEffect(() => {
+    async function loadTaskDetail() {
+      if (!user?.id || !taskId) return
+      
+      try {
+        const [assignmentData, submissionData] = await Promise.all([
+          getAssignmentById(taskId),
+          getStudentSubmissionForAssignment(user.id, taskId)
+        ])
+        
+        setAssignment(assignmentData)
+        setSubmission(submissionData)
+      } catch (error) {
+        console.error('Error loading task detail:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  if (!assignment) {
+    if (!authLoading && user) {
+      loadTaskDetail()
+    }
+  }, [user, authLoading, taskId])
+
+  if (authLoading || loading) {
     return (
-      <div className="p-8 text-center">
-        <h1 className="text-2xl font-bold mb-4">Assignment Not Found</h1>
-        <button onClick={() => router.back()} className="text-primary hover:underline">
-          ← Go Back
-        </button>
+      <div className="p-4 md:p-8 max-w-4xl">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+          <div className="space-y-4">
+            <div className="h-32 bg-muted rounded-xl"></div>
+            <div className="h-48 bg-muted rounded-xl"></div>
+          </div>
+        </div>
       </div>
     )
   }
 
-  const isOverdue = new Date() > new Date(assignment.deadline)
-  const timeUntilDeadline = new Date(assignment.deadline).getTime() - new Date().getTime()
-  const daysUntilDeadline = Math.ceil(timeUntilDeadline / (1000 * 60 * 60 * 24))
+  if (!assignment) {
+    return (
+      <div className="p-4 md:p-8 max-w-4xl">
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-4">Task Not Found</h2>
+          <p className="text-foreground/60 mb-6">The task you're looking for doesn't exist or you don't have access to it.</p>
+          <Link
+            href="/student/tasks"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Tasks
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: "" }))
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "approved":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "in_review":
+        return "bg-blue-100 text-blue-800 border-blue-200"
+      case "needs_changes":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
     }
   }
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {}
-    
-    assignment.requirements.forEach(req => {
-      if (req.required && !formData[req.field]?.trim()) {
-        newErrors[req.field] = `${req.label} is required`
-      } else if (formData[req.field] && req.type === "url") {
-        try {
-          new URL(formData[req.field])
-        } catch {
-          newErrors[req.field] = "Please enter a valid URL"
-        }
-      }
-    })
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!validateForm()) return
-
-    setLoading(true)
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    console.log("Submitting assignment:", { assignmentId: taskId, submission: formData })
-    
-    setLoading(false)
-    router.push(`/student/weeks/${assignment.weekId}`)
-  }
-
-  // Initialize form data with existing submission if available
-  useState(() => {
-    if (assignment.submission) {
-      setFormData(assignment.submission)
-    }
-  })
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="p-4 md:p-8 max-w-4xl">
       {/* Header */}
-      <div className="border-b border-border bg-card">
-        <div className="p-4 md:p-6">
-          <div className="flex items-center gap-4 mb-4">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-muted rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="flex-1">
-              <h1 className="text-2xl md:text-3xl font-bold">{assignment.title}</h1>
-              <p className="text-foreground/60">Week {assignment.weekId}: {assignment.weekTitle}</p>
-            </div>
+      <div className="mb-8">
+        <Link
+          href="/student/tasks"
+          className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-4 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Tasks
+        </Link>
+        
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">{assignment.title}</h1>
+            <p className="text-foreground/60">
+              Week {assignment.week?.week_number} • {assignment.week?.track?.name}
+            </p>
           </div>
-
-          {/* Deadline Warning */}
-          <div className={`p-4 rounded-lg border ${
-            isOverdue 
-              ? "bg-accent/10 border-accent/20"
-              : daysUntilDeadline <= 2
-              ? "bg-secondary/10 border-secondary/20"
-              : "bg-primary/10 border-primary/20"
-          }`}>
-            <div className="flex items-center gap-2">
-              {isOverdue ? (
-                <AlertCircle className="w-5 h-5 text-accent" />
-              ) : (
-                <Clock className="w-5 h-5 text-primary" />
-              )}
-              <span className={`font-medium ${
-                isOverdue ? "text-accent" : "text-foreground"
-              }`}>
-                {isOverdue 
-                  ? "This assignment is overdue"
-                  : `Due: ${new Date(assignment.deadline).toLocaleDateString()} at 11:59 PM`
-                }
-              </span>
-              {!isOverdue && daysUntilDeadline <= 2 && (
-                <span className="text-yellow-700 dark:text-yellow-300">
-                  ({daysUntilDeadline} day{daysUntilDeadline !== 1 ? 's' : ''} remaining)
-                </span>
-              )}
-            </div>
-          </div>
+          
+          {submission && (
+            <span className={`px-3 py-1 rounded-full text-sm border ${getStatusColor(submission.status)}`}>
+              {submission.status === 'approved' ? 'Approved' :
+               submission.status === 'in_review' ? 'In Review' :
+               submission.status === 'needs_changes' ? 'Needs Changes' : 'Pending'}
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="p-4 md:p-6 max-w-4xl mx-auto">
-        {/* Assignment Description */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">Assignment Description</h2>
-          <p className="text-foreground/70 mb-6">{assignment.description}</p>
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Assignment Details */}
+          <div className="p-6 rounded-xl bg-card border border-border">
+            <h2 className="text-xl font-bold mb-4">Assignment Details</h2>
+            
+            {assignment.requirements && (
+              <div className="mb-6">
+                <h3 className="font-semibold mb-2">Requirements</h3>
+                <div className="prose prose-sm max-w-none">
+                  <p className="text-foreground/80">{assignment.requirements}</p>
+                </div>
+              </div>
+            )}
+            
+            {assignment.submission_guidelines && (
+              <div className="mb-6">
+                <h3 className="font-semibold mb-2">Submission Guidelines</h3>
+                <div className="prose prose-sm max-w-none">
+                  <p className="text-foreground/80">{assignment.submission_guidelines}</p>
+                </div>
+              </div>
+            )}
 
-          {/* Guidelines */}
-          <div className="bg-card border border-border rounded-lg p-6">
-            <h3 className="font-semibold mb-4">Guidelines</h3>
-            <ul className="space-y-2">
-              {assignment.guidelines.map((guideline, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-                  <span className="text-foreground/80">{guideline}</span>
-                </li>
-              ))}
-            </ul>
+            {assignment.video_guide && (
+              <div className="mb-6">
+                <h3 className="font-semibold mb-2">Video Guide</h3>
+                <a
+                  href={assignment.video_guide}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  Watch Video Guide
+                </a>
+              </div>
+            )}
+
+            {assignment.learning_materials && assignment.learning_materials.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Learning Materials</h3>
+                <div className="space-y-2">
+                  {assignment.learning_materials.map((material: any, index: number) => (
+                    <a
+                      key={index}
+                      href={material.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <FileText className="w-4 h-4" />
+                      {material.title || `Material ${index + 1}`}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Submission Form */}
-        {assignment.submitted ? (
-          <div className="bg-primary/10 border border-primary/20 rounded-lg p-6">
-            <h3 className="font-semibold text-primary mb-4">
-              Assignment Submitted ✓
-            </h3>
-            <div className="space-y-4">
-              {assignment.requirements.map((req) => {
-                const value = assignment.submission?.[req.field as keyof typeof assignment.submission]
-                if (!value) return null
-
-                return (
-                  <div key={req.field}>
-                    <label className="font-medium text-green-800 dark:text-green-200">
-                      {req.label}:
-                    </label>
-                    {req.type === "url" ? (
-                      <a
-                        href={value}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ml-2 text-primary hover:underline inline-flex items-center gap-1"
-                      >
-                        {value} <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      <p className="mt-1 text-green-700 dark:text-green-300">{value}</p>
-                    )}
+          {/* Submission Status */}
+          {submission && (
+            <div className="p-6 rounded-xl bg-card border border-border">
+              <h2 className="text-xl font-bold mb-4">Your Submission</h2>
+              
+              <div className="space-y-4">
+                {submission.github_url && (
+                  <div>
+                    <label className="block font-medium mb-1">GitHub Repository</label>
+                    <a
+                      href={submission.github_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:text-primary/80 transition-colors"
+                    >
+                      {submission.github_url}
+                    </a>
                   </div>
-                )
-              })}
-            </div>
-            <div className="mt-6 pt-4 border-t border-green-200 dark:border-green-800">
-              <p className="text-sm text-green-700 dark:text-green-300">
-                Your submission is under review. You'll be notified once it's been graded.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <h2 className="text-xl font-semibold">Submit Your Assignment</h2>
-
-            {assignment.requirements.map((req) => (
-              <div key={req.field}>
-                <label className="block font-medium mb-2">
-                  {req.label}
-                  {req.required && <span className="text-red-500 ml-1">*</span>}
-                </label>
-                
-                {req.type === "textarea" ? (
-                  <textarea
-                    value={formData[req.field] || ""}
-                    onChange={(e) => handleInputChange(req.field, e.target.value)}
-                    placeholder={req.placeholder}
-                    className={`w-full p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary ${
-                      errors[req.field] ? "border-red-500" : "border-border"
-                    }`}
-                    rows={4}
-                  />
-                ) : (
-                  <input
-                    type={req.type === "url" ? "url" : "text"}
-                    value={formData[req.field] || ""}
-                    onChange={(e) => handleInputChange(req.field, e.target.value)}
-                    placeholder={req.placeholder}
-                    className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
-                      errors[req.field] ? "border-red-500" : "border-border"
-                    }`}
-                  />
                 )}
                 
-                {errors[req.field] && (
-                  <p className="text-red-500 text-sm mt-1">{errors[req.field]}</p>
+                {submission.demo_url && (
+                  <div>
+                    <label className="block font-medium mb-1">Demo URL</label>
+                    <a
+                      href={submission.demo_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:text-primary/80 transition-colors"
+                    >
+                      {submission.demo_url}
+                    </a>
+                  </div>
+                )}
+                
+                {submission.notes && (
+                  <div>
+                    <label className="block font-medium mb-1">Notes</label>
+                    <p className="text-foreground/80">{submission.notes}</p>
+                  </div>
+                )}
+                
+                {submission.feedback && (
+                  <div>
+                    <label className="block font-medium mb-1">Feedback</label>
+                    <div className="p-3 rounded-lg bg-muted">
+                      <p className="text-foreground/80">{submission.feedback}</p>
+                    </div>
+                  </div>
                 )}
               </div>
-            ))}
-
-            {/* Submit Button */}
-            <div className="flex gap-4 pt-6">
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="px-6 py-3 border border-border rounded-lg hover:bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading || isOverdue}
-                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? "Submitting..." : "Submit Assignment"}
-              </button>
             </div>
+          )}
+        </div>
 
-            {isOverdue && (
-              <p className="text-red-500 text-sm">
-                This assignment is overdue. Please contact your mentor for late submission approval.
-              </p>
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Assignment Info */}
+          <div className="p-6 rounded-xl bg-card border border-border">
+            <h3 className="font-bold mb-4">Assignment Info</h3>
+            
+            <div className="space-y-3">
+              {assignment.deadline && (
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-4 h-4 text-foreground/60" />
+                  <div>
+                    <p className="text-sm font-medium">Due Date</p>
+                    <p className="text-sm text-foreground/60">
+                      {new Date(assignment.deadline).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-3">
+                <Clock className="w-4 h-4 text-foreground/60" />
+                <div>
+                  <p className="text-sm font-medium">Status</p>
+                  <p className="text-sm text-foreground/60">
+                    {submission ? 
+                      (submission.status === 'approved' ? 'Completed' : 'Submitted') : 
+                      'Not Submitted'
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <div className="p-6 rounded-xl bg-card border border-border">
+            {!submission ? (
+              <Link
+                href={`/student/tasks/${taskId}/submit`}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                <Send className="w-4 h-4" />
+                Submit Assignment
+              </Link>
+            ) : submission.status === 'needs_changes' ? (
+              <Link
+                href={`/student/tasks/${taskId}/submit`}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors"
+              >
+                <Send className="w-4 h-4" />
+                Resubmit Assignment
+              </Link>
+            ) : (
+              <div className="text-center">
+                <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                <p className="text-sm text-foreground/60">
+                  {submission.status === 'approved' ? 'Assignment Approved' : 'Submission Under Review'}
+                </p>
+              </div>
             )}
-          </form>
-        )}
+          </div>
+        </div>
       </div>
     </div>
   )

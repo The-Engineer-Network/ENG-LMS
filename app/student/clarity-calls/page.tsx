@@ -1,59 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Calendar, Clock, MessageSquare, Plus, CheckCircle2, AlertCircle } from "lucide-react"
-
-const mockClarityRequests = [
-  {
-    id: 1,
-    topic: "Understanding React Hooks",
-    week: 1,
-    weekTitle: "React Fundamentals",
-    preferredDate: "2024-02-20",
-    preferredTime: "14:00",
-    status: "scheduled",
-    scheduledDate: "2024-02-20T14:00:00Z",
-    meetingLink: "https://meet.google.com/abc-defg-hij",
-    notes: "I'm having trouble understanding useEffect dependencies and when to use cleanup functions.",
-    createdAt: "2024-02-15T10:30:00Z"
-  },
-  {
-    id: 2,
-    topic: "State Management Best Practices",
-    week: 2,
-    weekTitle: "State Management",
-    preferredDate: "2024-02-25",
-    preferredTime: "15:30",
-    status: "pending",
-    notes: "Need clarification on when to use Context vs local state vs external state management.",
-    createdAt: "2024-02-22T09:15:00Z"
-  },
-  {
-    id: 3,
-    topic: "Component Composition Patterns",
-    week: 3,
-    weekTitle: "Component Composition",
-    preferredDate: "2024-03-05",
-    preferredTime: "16:00",
-    status: "completed",
-    scheduledDate: "2024-03-01T16:00:00Z",
-    notes: "Questions about render props vs compound components and when to use each pattern.",
-    createdAt: "2024-02-28T11:45:00Z",
-    feedback: "Great session! The examples really helped clarify the differences between patterns."
-  }
-]
-
-const mockWeeks = [
-  { id: 1, title: "React Fundamentals" },
-  { id: 2, title: "State Management" },
-  { id: 3, title: "Component Composition" },
-  { id: 4, title: "API Integration" },
-  { id: 5, title: "Testing & Performance" },
-  { id: 6, title: "Deployment & Production" }
-]
+import { useAuth } from "@/lib/hooks/useAuth"
+import { getStudentClarityRequests, getWeeksByTrack, getStudentEnrollment, createClarityCallRequest } from "@/lib/data"
 
 export default function ClarityCallsPage() {
+  const { user, loading: authLoading } = useAuth()
   const [showRequestForm, setShowRequestForm] = useState(false)
+  const [requests, setRequests] = useState<any[]>([])
+  const [weeks, setWeeks] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [formData, setFormData] = useState({
     topic: "",
     week: "",
@@ -61,27 +18,89 @@ export default function ClarityCallsPage() {
     preferredTime: "",
     notes: ""
   })
-  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    async function loadData() {
+      if (!user?.id) return
+      
+      try {
+        const [clarityRequests, enrollment] = await Promise.all([
+          getStudentClarityRequests(user.id),
+          getStudentEnrollment(user.id)
+        ])
+        
+        // Transform requests to match expected structure
+        const mockClarityRequests = clarityRequests.map((request: any) => ({
+          id: request.id,
+          topic: request.topic,
+          week: request.week?.week_number || 1,
+          weekTitle: request.week?.title || 'Week',
+          preferredDate: request.preferred_date,
+          preferredTime: request.preferred_time,
+          status: request.status,
+          scheduledDate: request.scheduled_date,
+          meetingLink: request.meeting_link,
+          notes: request.notes,
+          createdAt: request.created_at,
+          feedback: request.feedback
+        }))
+        
+        setRequests(mockClarityRequests)
+        
+        if (enrollment?.track_id) {
+          const weeksData = await getWeeksByTrack(enrollment.track_id)
+          const mockWeeks = weeksData.map((week: any) => ({
+            id: week.id,
+            title: week.title
+          }))
+          setWeeks(mockWeeks)
+        }
+      } catch (error) {
+        console.error('Error loading clarity calls data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!authLoading && user) {
+      loadData()
+    }
+  }, [user, authLoading])
 
   const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    console.log("Submitting clarity call request:", formData)
+    if (!user?.id) return
     
-    // Reset form
-    setFormData({
-      topic: "",
-      week: "",
-      preferredDate: "",
-      preferredTime: "",
-      notes: ""
-    })
-    setShowRequestForm(false)
-    setLoading(false)
+    setLoading(true)
+    try {
+      await createClarityCallRequest({
+        student_id: user.id,
+        topic: formData.topic,
+        description: formData.notes,
+        week_id: formData.week || undefined,
+        preferred_time: `${formData.preferredDate} ${formData.preferredTime}`
+      })
+      
+      // Refresh requests
+      const updatedRequests = await getStudentClarityRequests(user.id)
+      setRequests(updatedRequests)
+      
+      // Reset form
+      setFormData({
+        topic: "",
+        week: "",
+        preferredDate: "",
+        preferredTime: "",
+        notes: ""
+      })
+      setShowRequestForm(false)
+      alert('Clarity call request submitted successfully!')
+    } catch (error) {
+      console.error('Error submitting request:', error)
+      alert('Failed to submit request')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const getStatusIcon = (status: string) => {
@@ -108,6 +127,22 @@ export default function ClarityCallsPage() {
       default:
         return "bg-muted/20 border-muted"
     }
+  }
+
+  if (authLoading || loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-4xl">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+          <div className="space-y-4">
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="h-32 bg-muted rounded-xl"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -157,7 +192,7 @@ export default function ClarityCallsPage() {
                   required
                 >
                   <option value="">Select a week</option>
-                  {mockWeeks.map(week => (
+                  {weeks.map(week => (
                     <option key={week.id} value={week.id}>
                       Week {week.id}: {week.title}
                     </option>
@@ -224,7 +259,7 @@ export default function ClarityCallsPage() {
 
       {/* Requests List */}
       <div className="space-y-4">
-        {mockClarityRequests.length === 0 ? (
+        {requests.length === 0 ? (
           <div className="text-center py-12">
             <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">No clarity calls yet</h3>
@@ -237,7 +272,7 @@ export default function ClarityCallsPage() {
             </button>
           </div>
         ) : (
-          mockClarityRequests.map(request => (
+          requests.map(request => (
             <div
               key={request.id}
               className={`p-6 rounded-lg border ${getStatusColor(request.status)}`}

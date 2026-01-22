@@ -1,61 +1,51 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { CheckCircle2, Circle, Eye, Send } from "lucide-react"
-
-const mockTasks = [
-  {
-    id: 1,
-    title: "React Fundamentals",
-    description: "Learn core React concepts including components, JSX, and hooks",
-    deadline: "2024-02-15",
-    status: "Approved",
-    requirements: "3 requirements",
-    submission: true,
-  },
-  {
-    id: 2,
-    title: "State Management",
-    description: "Master state management with Context API and custom hooks",
-    deadline: "2024-02-22",
-    status: "In Review",
-    requirements: "4 requirements",
-    submission: true,
-  },
-  {
-    id: 3,
-    title: "Component Composition",
-    description: "Build reusable components and understand composition patterns",
-    deadline: "2024-03-01",
-    status: "Pending",
-    requirements: "5 requirements",
-    submission: false,
-  },
-  {
-    id: 4,
-    title: "API Integration",
-    description: "Connect to REST APIs and handle async operations",
-    deadline: "2024-03-10",
-    status: "Pending",
-    requirements: "4 requirements",
-    submission: false,
-  },
-  {
-    id: 5,
-    title: "Testing & QA",
-    description: "Write unit tests and perform quality assurance",
-    deadline: "2024-03-20",
-    status: "Pending",
-    requirements: "3 requirements",
-    submission: false,
-  },
-]
+import { useAuth } from "@/lib/hooks/useAuth"
+import { getStudentSubmissions } from "@/lib/data"
 
 export default function TasksPage() {
+  const { user, loading: authLoading } = useAuth()
   const [filter, setFilter] = useState<"all" | "approved" | "pending" | "review">("all")
+  const [tasks, setTasks] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredTasks = mockTasks.filter((task) => {
+  useEffect(() => {
+    async function loadTasks() {
+      if (!user?.id) return
+      
+      try {
+        const submissions = await getStudentSubmissions(user.id)
+        
+        // Transform submissions to match the expected task structure
+        const mockTasks = submissions.map((submission: any) => ({
+          id: submission.assignment?.id || submission.id,
+          title: submission.assignment?.week?.title || 'Assignment',
+          description: `Week ${submission.assignment?.week?.week_number || 1} assignment`,
+          deadline: submission.assignment?.deadline || new Date().toISOString().split('T')[0],
+          status: submission.status === 'approved' ? 'Approved' : 
+                  submission.status === 'in_review' ? 'In Review' : 'Pending',
+          requirements: `${submission.assignment?.requirements?.length || 3} requirements`,
+          submission: !!submission.submitted_at,
+        }))
+        
+        setTasks(mockTasks)
+      } catch (error) {
+        console.error('Error loading tasks:', error)
+        setTasks([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!authLoading && user) {
+      loadTasks()
+    }
+  }, [user, authLoading])
+
+  const filteredTasks = tasks.filter((task) => {
     if (filter === "approved") return task.status === "Approved"
     if (filter === "pending") return task.status === "Pending"
     if (filter === "review") return task.status === "In Review"
@@ -73,6 +63,22 @@ export default function TasksPage() {
       default:
         return ""
     }
+  }
+
+  if (authLoading || loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-7xl">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/4 mb-4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-32 bg-muted rounded-xl"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -1,56 +1,227 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Search, Plus, Edit2, Trash2 } from "lucide-react"
-
-const mockStudents = [
-  { id: 1, name: "Alex Johnson", track: "Frontend", progress: 65, tasksCompleted: 13, email: "alex@example.com" },
-  { id: 2, name: "Sarah Chen", track: "Backend", progress: 72, tasksCompleted: 14, email: "sarah@example.com" },
-  { id: 3, name: "Mike Johnson", track: "DevOps", progress: 58, tasksCompleted: 11, email: "mike@example.com" },
-  { id: 4, name: "Emily Davis", track: "Web3", progress: 45, tasksCompleted: 9, email: "emily@example.com" },
-  { id: 5, name: "Jordan Smith", track: "Frontend", progress: 72, tasksCompleted: 14, email: "jordan@example.com" },
-]
+import { useAuth } from "@/lib/hooks/useAuth"
+import { useToast } from "@/components/ui/toast"
+import { getStudentEnrollments, getTracks, getCohorts, createStudentEnrollment, updateStudentEnrollment, deleteStudentEnrollment } from "@/lib/data"
 
 export default function StudentsPage() {
+  const { user, loading: authLoading } = useAuth()
+  const { showToast } = useToast()
+  const [students, setStudents] = useState<any[]>([])
+  const [tracks, setTracks] = useState<any[]>([])
+  const [cohorts, setCohorts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterTrack, setFilterTrack] = useState<string>("all")
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
 
-  const handleEditStudent = (studentId: number) => {
-    const student = mockStudents.find(s => s.id === studentId)
+  useEffect(() => {
+    async function loadData() {
+      if (!user?.id) return
+      
+      try {
+        console.log('Loading students page data...')
+        
+        // Load tracks and cohorts separately to avoid failure cascade
+        const [tracksData, cohortsData] = await Promise.all([
+          getTracks(),
+          getCohorts()
+        ])
+        
+        console.log('Loaded tracks and cohorts:', {
+          tracks: tracksData,
+          cohorts: cohortsData
+        })
+        
+        setTracks(tracksData)
+        setCohorts(cohortsData)
+        
+        // Try to load students separately - if it fails, we still have tracks/cohorts
+        try {
+          const studentsData = await getStudentEnrollments()
+          console.log('Loaded students:', studentsData)
+          
+          // Transform students to match expected structure
+          const transformedStudents = studentsData.map((enrollment: any) => ({
+            id: enrollment.user?.id || enrollment.user_id,
+            name: enrollment.user?.full_name || 'Unknown Student',
+            track: enrollment.track?.name || 'Unknown Track',
+            progress: enrollment.progress_percentage || 0,
+            tasksCompleted: enrollment.tasks_completed || 0,
+            email: enrollment.user?.email || 'No email',
+            cohort: enrollment.cohort?.name || 'Unknown Cohort',
+            enrollmentId: enrollment.id
+          }))
+          
+          setStudents(transformedStudents)
+        } catch (studentsError) {
+          console.error('Error loading students (but tracks/cohorts loaded):', studentsError)
+          setStudents([]) // Empty students list, but tracks/cohorts still work
+        }
+        
+        console.log('Final state:', {
+          tracksCount: tracksData.length,
+          cohortsCount: cohortsData.length
+        })
+      } catch (error: any) {
+        console.error('Error loading tracks/cohorts:', error)
+        setStudents([])
+        setTracks([])
+        setCohorts([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!authLoading && user) {
+      loadData()
+    }
+  }, [user, authLoading])
+
+  const handleEditStudent = (studentId: string) => {
+    const student = students.find(s => s.id === studentId)
     setSelectedStudent(student)
     setShowEditModal(true)
     console.log("Edit student:", studentId)
   }
 
-  const handleDeleteStudent = (studentId: number) => {
-    console.log("Delete student:", studentId)
-    // TODO: Implement delete functionality
+  const handleDeleteStudent = async (studentId: string) => {
+    try {
+      const student = students.find(s => s.id === studentId)
+      if (student?.enrollmentId) {
+        await deleteStudentEnrollment(student.enrollmentId)
+        // Refresh the students list
+        const updatedStudents = students.filter(s => s.id !== studentId)
+        setStudents(updatedStudents)
+        
+        showToast({
+          type: 'success',
+          title: 'Student Removed',
+          message: `${student.name} has been successfully removed from the enrollment.`
+        })
+      }
+    } catch (error: any) {
+      console.error('Error deleting student:', error)
+      showToast({
+        type: 'error',
+        title: 'Deletion Failed',
+        message: error.message || 'Failed to delete student enrollment. Please try again.'
+      })
+    }
   }
 
   const handleAddStudent = () => {
+    console.log('Opening add student modal')
+    console.log('Available tracks:', tracks)
+    console.log('Available cohorts:', cohorts)
     setShowAddModal(true)
-    console.log("Add new student")
-    // TODO: Implement add student functionality
   }
 
-  const handleUpdateStudent = (e: React.FormEvent) => {
+
+
+  const handleUpdateStudent = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Update student:", selectedStudent)
-    setShowEditModal(false)
-    setSelectedStudent(null)
-    // TODO: Implement update functionality
+    if (!selectedStudent) return
+    
+    try {
+      await updateStudentEnrollment(selectedStudent.enrollmentId, {
+        track_id: selectedStudent.track,
+        cohort_id: selectedStudent.cohort
+      })
+      
+      // Update local state
+      setStudents(prev => prev.map(s => 
+        s.id === selectedStudent.id ? selectedStudent : s
+      ))
+      
+      showToast({
+        type: 'success',
+        title: 'Student Updated',
+        message: `${selectedStudent.name}'s enrollment has been successfully updated.`
+      })
+      
+      setShowEditModal(false)
+      setSelectedStudent(null)
+    } catch (error: any) {
+      console.error('Error updating student:', error)
+      showToast({
+        type: 'error',
+        title: 'Update Failed',
+        message: error.message || 'Failed to update student enrollment. Please try again.'
+      })
+    }
   }
 
-  const filteredStudents = mockStudents.filter(
+  const handleCreateStudent = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const formData = new FormData(e.target as HTMLFormElement)
+    
+    try {
+      const newEnrollment = await createStudentEnrollment({
+        email: formData.get('email') as string,
+        full_name: formData.get('name') as string,
+        track_id: formData.get('track') as string,
+        cohort_id: formData.get('cohort') as string
+      })
+      
+      // Add to local state
+      const newStudent = {
+        id: newEnrollment.user?.id || newEnrollment.user_id,
+        name: newEnrollment.user?.full_name || 'Unknown Student',
+        track: newEnrollment.track?.name || 'Unknown Track',
+        progress: 0,
+        tasksCompleted: 0,
+        email: newEnrollment.user?.email || 'No email',
+        cohort: newEnrollment.cohort?.name || 'Unknown Cohort',
+        enrollmentId: newEnrollment.id
+      }
+      
+      setStudents(prev => [...prev, newStudent])
+      
+      showToast({
+        type: 'success',
+        title: 'Student Added',
+        message: `${newStudent.name} has been successfully enrolled in the program.`
+      })
+      
+      setShowAddModal(false)
+    } catch (error: any) {
+      console.error('Error creating student:', error)
+      showToast({
+        type: 'error',
+        title: 'Enrollment Failed',
+        message: error.message || 'Failed to create student enrollment. Please try again.'
+      })
+    }
+  }
+
+  const filteredStudents = students.filter(
     (student) =>
       (filterTrack === "all" || student.track === filterTrack) &&
       student.name.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const tracks = ["all", ...new Set(mockStudents.map((s) => s.track))]
+  const trackOptions = ["all", ...tracks.map((t) => t.name)]
+
+  if (authLoading || loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-7xl">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-20 bg-muted rounded-xl"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 md:p-8 max-w-7xl">
@@ -74,7 +245,7 @@ export default function StudentsPage() {
       {/* Filters */}
       <div className="mb-6 space-y-4">
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {tracks.map((track) => (
+          {trackOptions.map((track) => (
             <button
               key={track}
               onClick={() => setFilterTrack(track)}
@@ -150,7 +321,11 @@ export default function StudentsPage() {
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDeleteStudent(student.id)}
+                      onClick={() => {
+                        if (confirm(`Are you sure you want to remove ${student.name} from the enrollment? This action cannot be undone.`)) {
+                          handleDeleteStudent(student.id)
+                        }
+                      }}
                       className="p-2 text-accent hover:bg-accent/10 rounded-lg transition-colors"
                       title="Delete Student"
                     >
@@ -169,10 +344,11 @@ export default function StudentsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Add New Student</h2>
-            <form className="space-y-4">
+            <form onSubmit={handleCreateStudent} className="space-y-4">
               <div>
                 <label className="block font-medium mb-2">Full Name *</label>
                 <input
+                  name="name"
                   type="text"
                   placeholder="Enter student name"
                   className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -183,6 +359,7 @@ export default function StudentsPage() {
               <div>
                 <label className="block font-medium mb-2">Email *</label>
                 <input
+                  name="email"
                   type="email"
                   placeholder="Enter email address"
                   className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
@@ -193,28 +370,28 @@ export default function StudentsPage() {
               <div>
                 <label className="block font-medium mb-2">Track *</label>
                 <select
+                  name="track"
                   className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 >
                   <option value="">Select track</option>
-                  <option value="Frontend">Frontend Development</option>
-                  <option value="Backend">Backend Development</option>
-                  <option value="DevOps">DevOps / Cloud</option>
-                  <option value="Data">Data / AI / ML</option>
-                  <option value="Web3">Web3 / Blockchain</option>
+                  {tracks.map(track => (
+                    <option key={track.id} value={track.id}>{track.name}</option>
+                  ))}
                 </select>
               </div>
               
               <div>
                 <label className="block font-medium mb-2">Cohort *</label>
                 <select
+                  name="cohort"
                   className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 >
                   <option value="">Select cohort</option>
-                  <option value="Cohort 1">Cohort 1</option>
-                  <option value="Cohort 2">Cohort 2</option>
-                  <option value="Cohort 3">Cohort 3</option>
+                  {cohorts.map(cohort => (
+                    <option key={cohort.id} value={cohort.id}>{cohort.name}</option>
+                  ))}
                 </select>
               </div>
 
@@ -274,11 +451,9 @@ export default function StudentsPage() {
                   required
                 >
                   <option value="">Select track</option>
-                  <option value="Frontend">Frontend Development</option>
-                  <option value="Backend">Backend Development</option>
-                  <option value="DevOps">DevOps / Cloud</option>
-                  <option value="Data">Data / AI / ML</option>
-                  <option value="Web3">Web3 / Blockchain</option>
+                  {tracks.map(track => (
+                    <option key={track.id} value={track.name}>{track.name}</option>
+                  ))}
                 </select>
               </div>
               

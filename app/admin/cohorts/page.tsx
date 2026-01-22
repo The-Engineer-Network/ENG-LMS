@@ -2,17 +2,15 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plus, Trash2, Edit2 } from "lucide-react"
-
-const mockCohorts = [
-  { id: 1, name: "Cohort 1", startDate: "2024-01-15", endDate: "2024-02-26", students: 45, status: "Active" },
-  { id: 2, name: "Cohort 2", startDate: "2024-02-01", endDate: "2024-03-13", students: 38, status: "Active" },
-  { id: 3, name: "Cohort 3", startDate: "2024-03-01", endDate: "2024-04-12", students: 0, status: "Upcoming" },
-]
+import { useAuth } from "@/lib/hooks/useAuth"
+import { getCohorts, createCohort, updateCohort, deleteCohort } from "@/lib/data"
 
 export default function CohortsPage() {
-  const [cohorts, setCohorts] = useState(mockCohorts)
+  const { user, loading: authLoading } = useAuth()
+  const [cohorts, setCohorts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
@@ -20,23 +18,127 @@ export default function CohortsPage() {
     endDate: "",
   })
 
-  const handleAddCohort = (e: React.FormEvent) => {
+  const [editingCohort, setEditingCohort] = useState<any>(null)
+
+  useEffect(() => {
+    async function loadCohorts() {
+      if (!user?.id) return
+      
+      try {
+        const cohortsData = await getCohorts()
+        
+        // Transform cohorts to match expected structure
+        const transformedCohorts = cohortsData.map((cohort: any) => ({
+          id: cohort.id,
+          name: cohort.name,
+          startDate: cohort.start_date,
+          endDate: cohort.end_date,
+          students: 0, // TODO: Get actual student count from enrollments
+          status: cohort.status || (new Date(cohort.start_date) > new Date() ? "Upcoming" : "Active")
+        }))
+        
+        setCohorts(transformedCohorts)
+      } catch (error) {
+        console.error('Error loading cohorts:', error)
+        setCohorts([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!authLoading && user) {
+      loadCohorts()
+    }
+  }, [user, authLoading])
+
+  const handleAddCohort = async (e: React.FormEvent) => {
     e.preventDefault()
     if (formData.name.trim() && formData.startDate && formData.endDate) {
-      setCohorts([
-        ...cohorts,
-        {
-          id: cohorts.length + 1,
-          name: formData.name,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          students: 0,
-          status: "Upcoming",
-        },
-      ])
-      setFormData({ name: "", startDate: "", endDate: "" })
-      setShowForm(false)
+      try {
+        if (editingCohort) {
+          const updatedCohort = await updateCohort(editingCohort.id, {
+            name: formData.name,
+            start_date: formData.startDate,
+            end_date: formData.endDate,
+            status: new Date(formData.startDate) > new Date() ? "Upcoming" : "Active"
+          })
+          
+          // Update local state
+          setCohorts(prev => prev.map(c => 
+            c.id === editingCohort.id ? {
+              id: updatedCohort.id,
+              name: updatedCohort.name,
+              startDate: updatedCohort.start_date,
+              endDate: updatedCohort.end_date,
+              students: 0,
+              status: updatedCohort.status
+            } : c
+          ))
+        } else {
+          const newCohort = await createCohort({
+            name: formData.name,
+            start_date: formData.startDate,
+            end_date: formData.endDate,
+            status: new Date(formData.startDate) > new Date() ? "Upcoming" : "Active"
+          })
+          
+          // Add to local state
+          setCohorts(prev => [...prev, {
+            id: newCohort.id,
+            name: newCohort.name,
+            startDate: newCohort.start_date,
+            endDate: newCohort.end_date,
+            students: 0,
+            status: newCohort.status
+          }])
+        }
+        
+        setFormData({ name: "", startDate: "", endDate: "" })
+        setEditingCohort(null)
+        setShowForm(false)
+      } catch (error) {
+        console.error('Error saving cohort:', error)
+        alert('Failed to save cohort')
+      }
     }
+  }
+
+  const handleEditCohort = (cohort: any) => {
+    setEditingCohort(cohort)
+    setFormData({
+      name: cohort.name,
+      startDate: cohort.startDate,
+      endDate: cohort.endDate
+    })
+    setShowForm(true)
+  }
+
+  const handleDeleteCohort = async (cohortId: string) => {
+    if (confirm('Are you sure you want to delete this cohort? This action cannot be undone.')) {
+      try {
+        await deleteCohort(cohortId)
+        setCohorts(prev => prev.filter(c => c.id !== cohortId))
+      } catch (error) {
+        console.error('Error deleting cohort:', error)
+        alert('Failed to delete cohort')
+      }
+    }
+  }
+
+  if (authLoading || loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-7xl">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-24 bg-muted rounded-xl"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -108,11 +210,15 @@ export default function CohortsPage() {
               type="submit"
               className="flex-1 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
             >
-              Create Cohort
+              {editingCohort ? "Update Cohort" : "Create Cohort"}
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={() => {
+                setShowForm(false)
+                setEditingCohort(null)
+                setFormData({ name: "", startDate: "", endDate: "" })
+              }}
               className="flex-1 px-4 py-2 rounded-lg bg-background border border-border text-foreground font-semibold hover:bg-card transition-colors"
             >
               Cancel
@@ -147,10 +253,16 @@ export default function CohortsPage() {
               </div>
 
               <div className="flex gap-2">
-                <button className="p-2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors">
+                <button 
+                  onClick={() => handleEditCohort(cohort)}
+                  className="p-2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+                >
                   <Edit2 className="w-5 h-5" />
                 </button>
-                <button className="p-2 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 transition-colors">
+                <button 
+                  onClick={() => handleDeleteCohort(cohort.id)}
+                  className="p-2 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 transition-colors"
+                >
                   <Trash2 className="w-5 h-5" />
                 </button>
               </div>

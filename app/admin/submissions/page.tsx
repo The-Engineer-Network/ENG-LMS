@@ -1,129 +1,79 @@
 "use client"
 
-import { useState } from "react"
-import { CheckCircle2, Clock, AlertCircle, MessageSquare, ExternalLink, Eye, ThumbsUp, ThumbsDown, Filter } from "lucide-react"
-import Link from "next/link"
-
-const mockSubmissions = [
-  {
-    id: 1,
-    student: { name: "Alex Johnson", email: "alex@example.com", track: "Frontend", cohort: "Cohort 1" },
-    assignment: {
-      id: 1,
-      title: "Build a Counter Component",
-      week: 1,
-      weekTitle: "React Fundamentals"
-    },
-    submission: {
-      github: "https://github.com/alex/react-counter",
-      demo: "https://react-counter-demo.vercel.app",
-      notes: "Implemented with TypeScript and added bonus features like step increment"
-    },
-    status: "pending",
-    submittedDate: "2024-02-20T14:30:00Z",
-    reviewedBy: null,
-    reviewedDate: null,
-    feedback: null,
-    grade: null
-  },
-  {
-    id: 2,
-    student: { name: "Sarah Chen", email: "sarah@example.com", track: "Frontend", cohort: "Cohort 1" },
-    assignment: {
-      id: 2,
-      title: "Theme Context Provider",
-      week: 2,
-      weekTitle: "State Management"
-    },
-    submission: {
-      github: "https://github.com/sarah/theme-provider",
-      demo: "https://theme-provider-demo.vercel.app",
-      notes: "Added smooth transitions and localStorage persistence"
-    },
-    status: "in_review",
-    submittedDate: "2024-02-19T16:45:00Z",
-    reviewedBy: "John Doe",
-    reviewedDate: null,
-    feedback: null,
-    grade: null
-  },
-  {
-    id: 3,
-    student: { name: "Mike Johnson", email: "mike@example.com", track: "Backend", cohort: "Cohort 2" },
-    assignment: {
-      id: 3,
-      title: "REST API with Authentication",
-      week: 3,
-      weekTitle: "API Development"
-    },
-    submission: {
-      github: "https://github.com/mike/auth-api",
-      demo: "https://auth-api-demo.herokuapp.com",
-      notes: "Implemented JWT authentication with refresh tokens"
-    },
-    status: "needs_changes",
-    submittedDate: "2024-02-18T10:20:00Z",
-    reviewedBy: "Jane Smith",
-    reviewedDate: "2024-02-19T09:30:00Z",
-    feedback: "Good implementation overall, but please add input validation for the registration endpoint and improve error handling.",
-    grade: null
-  },
-  {
-    id: 4,
-    student: { name: "Emily Davis", email: "emily@example.com", track: "DevOps", cohort: "Cohort 1" },
-    assignment: {
-      id: 4,
-      title: "CI/CD Pipeline Setup",
-      week: 4,
-      weekTitle: "Deployment Automation"
-    },
-    submission: {
-      github: "https://github.com/emily/cicd-pipeline",
-      demo: "https://cicd-demo.netlify.app",
-      notes: "Set up GitHub Actions with automated testing and deployment"
-    },
-    status: "approved",
-    submittedDate: "2024-02-17T13:15:00Z",
-    reviewedBy: "John Doe",
-    reviewedDate: "2024-02-18T11:00:00Z",
-    feedback: "Excellent work! The pipeline is well-structured and includes proper testing stages. Great documentation too.",
-    grade: "A"
-  },
-  {
-    id: 5,
-    student: { name: "Jordan Smith", email: "jordan@example.com", track: "Frontend", cohort: "Cohort 1" },
-    assignment: {
-      id: 5,
-      title: "Reusable Modal Component",
-      week: 3,
-      weekTitle: "Component Composition"
-    },
-    submission: {
-      github: "https://github.com/jordan/modal-component",
-      demo: "https://modal-demo.vercel.app",
-      notes: "Used compound component pattern with proper accessibility features"
-    },
-    status: "in_review",
-    submittedDate: "2024-02-16T09:30:00Z",
-    reviewedBy: "Jane Smith",
-    reviewedDate: null,
-    feedback: null,
-    grade: null
-  }
-]
+import { useState, useEffect } from "react"
+import { CheckCircle2, Clock, AlertCircle, MessageSquare, ExternalLink, Eye, ThumbsUp, ThumbsDown, Filter, Download, Square, CheckSquare } from "lucide-react"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { useToast } from "@/components/ui/toast"
+import { getTaskSubmissions, updateSubmissionReview, bulkUpdateSubmissions } from "@/lib/data"
 
 export default function SubmissionsPage() {
+  const { user, loading: authLoading } = useAuth()
+  const { showToast } = useToast()
+  const [submissions, setSubmissions] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterTrack, setFilterTrack] = useState("all")
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null)
   const [showReviewModal, setShowReviewModal] = useState(false)
+  const [selectedSubmissions, setSelectedSubmissions] = useState<string[]>([])
+  const [bulkAction, setBulkAction] = useState("")
+  const [bulkLoading, setBulkLoading] = useState(false)
   const [reviewForm, setReviewForm] = useState({
     status: "",
     feedback: "",
     grade: ""
   })
 
-  const filteredSubmissions = mockSubmissions.filter(sub => {
+  useEffect(() => {
+    async function loadSubmissions() {
+      if (!user?.id) return
+      
+      try {
+        const submissionsData = await getTaskSubmissions()
+        
+        // Transform submissions to match expected structure
+        const transformedSubmissions = submissionsData.map((sub: any) => ({
+          id: sub.id,
+          student: {
+            name: sub.student?.full_name || 'Unknown Student',
+            email: sub.student?.email || 'No email',
+            track: sub.assignment?.week?.track?.name || 'Unknown Track',
+            cohort: 'Cohort 1' // TODO: Get from enrollment data
+          },
+          assignment: {
+            id: sub.assignment?.id || 0,
+            title: sub.assignment?.title || 'Unknown Assignment',
+            week: sub.assignment?.week?.week_number || 0,
+            weekTitle: sub.assignment?.week?.title || 'Unknown Week'
+          },
+          submission: {
+            github: sub.github_url || '',
+            demo: sub.demo_url || '',
+            notes: sub.notes || ''
+          },
+          status: sub.status,
+          submittedDate: sub.submitted_at,
+          reviewedBy: sub.reviewed_by || null,
+          reviewedDate: sub.reviewed_at || null,
+          feedback: sub.feedback || null,
+          grade: sub.grade || null
+        }))
+        
+        setSubmissions(transformedSubmissions)
+      } catch (error) {
+        console.error('Error loading submissions:', error)
+        setSubmissions([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!authLoading && user) {
+      loadSubmissions()
+    }
+  }, [user, authLoading])
+
+  const filteredSubmissions = submissions.filter(sub => {
     const matchesStatus = filterStatus === "all" || sub.status === filterStatus
     const matchesTrack = filterTrack === "all" || sub.student.track.toLowerCase() === filterTrack
     return matchesStatus && matchesTrack
@@ -190,34 +140,237 @@ export default function SubmissionsPage() {
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Submitting review:", {
-      submissionId: selectedSubmission.id,
-      ...reviewForm
-    })
+    if (!selectedSubmission || !user?.id) return
     
-    setShowReviewModal(false)
-    setSelectedSubmission(null)
-    setReviewForm({ status: "", feedback: "", grade: "" })
+    try {
+      await updateSubmissionReview(selectedSubmission.id, {
+        status: reviewForm.status as 'approved' | 'needs_changes' | 'in_review',
+        feedback: reviewForm.feedback,
+        grade: reviewForm.grade,
+        reviewed_by: user.id
+      })
+      
+      // Update local state
+      setSubmissions(prev => prev.map(sub => 
+        sub.id === selectedSubmission.id 
+          ? { ...sub, status: reviewForm.status, feedback: reviewForm.feedback, grade: reviewForm.grade }
+          : sub
+      ))
+      
+      setShowReviewModal(false)
+      setSelectedSubmission(null)
+      setReviewForm({ status: "", feedback: "", grade: "" })
+    } catch (error) {
+      console.error('Error submitting review:', error)
+      alert('Failed to submit review')
+    }
   }
 
-  const handleQuickAction = async (submissionId: number, action: "approve" | "reject") => {
-    console.log(`Quick ${action} for submission:`, submissionId)
+  const handleQuickAction = async (submissionId: string, action: "approve" | "reject") => {
+    if (!user?.id) return
+    
+    try {
+      await updateSubmissionReview(submissionId, {
+        status: action === "approve" ? "approved" : "needs_changes",
+        feedback: action === "approve" ? "Approved" : "Needs changes",
+        reviewed_by: user.id
+      })
+      
+      // Update local state
+      setSubmissions(prev => prev.map(sub => 
+        sub.id === submissionId 
+          ? { ...sub, status: action === "approve" ? "approved" : "needs_changes" }
+          : sub
+      ))
+    } catch (error) {
+      console.error('Error with quick action:', error)
+      alert('Failed to update submission')
+    }
+  }
+
+  // Bulk Operations
+  const handleSelectSubmission = (submissionId: string) => {
+    setSelectedSubmissions(prev => 
+      prev.includes(submissionId) 
+        ? prev.filter(id => id !== submissionId)
+        : [...prev, submissionId]
+    )
+  }
+
+  const handleSelectAll = () => {
+    if (selectedSubmissions.length === filteredSubmissions.length) {
+      setSelectedSubmissions([])
+    } else {
+      setSelectedSubmissions(filteredSubmissions.map(sub => sub.id))
+    }
+  }
+
+  const handleBulkAction = async () => {
+    if (!bulkAction || selectedSubmissions.length === 0 || !user?.id) return
+    
+    setBulkLoading(true)
+    try {
+      const updates: any = {
+        reviewed_by: user.id
+      }
+      
+      if (bulkAction === 'approve') {
+        updates.status = 'approved'
+        updates.feedback = 'Bulk approved'
+      } else if (bulkAction === 'reject') {
+        updates.status = 'needs_changes'
+        updates.feedback = 'Needs changes - bulk action'
+      } else if (bulkAction === 'review') {
+        updates.status = 'in_review'
+        updates.feedback = 'Under review - bulk action'
+      }
+      
+      // Call the bulk update function with correct parameters
+      await bulkUpdateSubmissions(selectedSubmissions, updates)
+      
+      // Update local state
+      setSubmissions(prev => prev.map(sub => 
+        selectedSubmissions.includes(sub.id) 
+          ? { 
+              ...sub, 
+              status: updates.status,
+              feedback: updates.feedback,
+              reviewedBy: user.full_name || user.email,
+              reviewedDate: new Date().toISOString().split('T')[0]
+            }
+          : sub
+      ))
+      
+      setSelectedSubmissions([])
+      setBulkAction("")
+      
+      showToast({
+        type: 'success',
+        title: 'Bulk Action Complete',
+        message: `Successfully ${bulkAction}ed ${selectedSubmissions.length} submissions`
+      })
+    } catch (error) {
+      console.error('Bulk action failed:', error)
+      showToast({
+        type: 'error',
+        title: 'Bulk Action Failed',
+        message: 'Failed to update submissions. Please try again.'
+      })
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const exportSubmissions = () => {
+    const csvData = [
+      ['Student', 'Email', 'Track', 'Assignment', 'Status', 'Submitted Date', 'GitHub', 'Demo'],
+      ...filteredSubmissions.map(sub => [
+        sub.student.name,
+        sub.student.email,
+        sub.student.track,
+        sub.assignment.title,
+        sub.status,
+        new Date(sub.submittedDate).toLocaleDateString(),
+        sub.submission.github || '',
+        sub.submission.demo || ''
+      ])
+    ]
+    
+    const csvContent = csvData.map(row => row.join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `submissions-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   const statusCounts = {
-    all: mockSubmissions.length,
-    pending: mockSubmissions.filter(s => s.status === "pending").length,
-    in_review: mockSubmissions.filter(s => s.status === "in_review").length,
-    needs_changes: mockSubmissions.filter(s => s.status === "needs_changes").length,
-    approved: mockSubmissions.filter(s => s.status === "approved").length
+    all: submissions.length,
+    pending: submissions.filter(s => s.status === "pending").length,
+    in_review: submissions.filter(s => s.status === "in_review").length,
+    needs_changes: submissions.filter(s => s.status === "needs_changes").length,
+    approved: submissions.filter(s => s.status === "approved").length
+  }
+
+  if (authLoading || loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-7xl">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-32 bg-muted rounded-xl"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="p-4 md:p-8 max-w-7xl">
-      {/* Header */}
+      {/* Header with Bulk Operations */}
       <div className="mb-8 animate-slideInUp">
-        <h1 className="text-3xl md:text-4xl font-bold mb-2">Submissions Review</h1>
-        <p className="text-foreground/60">Review and approve student assignment submissions</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">Submissions Review</h1>
+            <p className="text-foreground/60">Review and manage student task submissions</p>
+          </div>
+          
+          <div className="flex gap-2 mt-4 md:mt-0">
+            <button
+              onClick={exportSubmissions}
+              className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        {/* Bulk Operations Bar */}
+        {selectedSubmissions.length > 0 && (
+          <div className="mb-4 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="font-medium">
+                  {selectedSubmissions.length} submission{selectedSubmissions.length !== 1 ? 's' : ''} selected
+                </span>
+                
+                <select
+                  value={bulkAction}
+                  onChange={(e) => setBulkAction(e.target.value)}
+                  className="px-3 py-1 border border-border rounded"
+                >
+                  <option value="">Choose action...</option>
+                  <option value="approve">Approve All</option>
+                  <option value="reject">Request Changes</option>
+                  <option value="review">Mark as In Review</option>
+                </select>
+                
+                <button
+                  onClick={handleBulkAction}
+                  disabled={!bulkAction || bulkLoading}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {bulkLoading ? 'Processing...' : 'Apply'}
+                </button>
+              </div>
+              
+              <button
+                onClick={() => setSelectedSubmissions([])}
+                className="text-foreground/60 hover:text-foreground"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -235,35 +388,54 @@ export default function SubmissionsPage() {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="mb-6 flex flex-col md:flex-row gap-4">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-foreground/60" />
-          <span className="text-sm font-medium">Filters:</span>
+      {/* Filters with Select All */}
+      <div className="mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-foreground/60" />
+            <span className="text-sm font-medium">Filters:</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSelectAll}
+              className="flex items-center gap-2 px-3 py-1 border border-border rounded hover:bg-muted transition-colors"
+            >
+              {selectedSubmissions.length === filteredSubmissions.length && filteredSubmissions.length > 0 ? (
+                <CheckSquare className="w-4 h-4" />
+              ) : (
+                <Square className="w-4 h-4" />
+              )}
+              <span className="text-sm">Select All</span>
+            </button>
+          </div>
         </div>
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option value="all">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="in_review">In Review</option>
-          <option value="needs_changes">Needs Changes</option>
-          <option value="approved">Approved</option>
-        </select>
-        <select
-          value={filterTrack}
-          onChange={(e) => setFilterTrack(e.target.value)}
-          className="px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option value="all">All Tracks</option>
-          <option value="frontend">Frontend</option>
-          <option value="backend">Backend</option>
-          <option value="devops">DevOps</option>
-          <option value="data">Data/AI</option>
-          <option value="web3">Web3</option>
-        </select>
+        
+        <div className="flex gap-4">
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="in_review">In Review</option>
+            <option value="needs_changes">Needs Changes</option>
+            <option value="approved">Approved</option>
+          </select>
+          <select
+            value={filterTrack}
+            onChange={(e) => setFilterTrack(e.target.value)}
+            className="px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="all">All Tracks</option>
+            <option value="frontend">Frontend</option>
+            <option value="backend">Backend</option>
+            <option value="devops">DevOps</option>
+            <option value="data">Data/AI</option>
+            <option value="web3">Web3</option>
+          </select>
+        </div>
       </div>
 
       {/* Submissions List */}
@@ -275,39 +447,51 @@ export default function SubmissionsPage() {
             <p className="text-foreground/60">No submissions match your current filters</p>
           </div>
         ) : (
-          filteredSubmissions.map((submission, i) => (
+          filteredSubmissions.map((sub, i) => (
             <div
-              key={submission.id}
-              className={`p-6 rounded-lg border ${getStatusColor(submission.status)} animate-fadeInScale`}
+              key={sub.id}
+              className={`p-6 rounded-lg border ${getStatusColor(sub.status)} animate-fadeInScale`}
               style={{ animationDelay: `${i * 80}ms` }}
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-start gap-4 flex-1">
-                  {getStatusIcon(submission.status)}
+                  {/* Selection Checkbox */}
+                  <button
+                    onClick={() => handleSelectSubmission(sub.id)}
+                    className="mt-1 p-1 hover:bg-muted rounded transition-colors"
+                  >
+                    {selectedSubmissions.includes(sub.id) ? (
+                      <CheckSquare className="w-5 h-5 text-primary" />
+                    ) : (
+                      <Square className="w-5 h-5 text-muted-foreground" />
+                    )}
+                  </button>
+                  
+                  {getStatusIcon(sub.status)}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-lg">{submission.assignment.title}</h3>
-                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusBadgeColor(submission.status)}`}>
-                        {formatStatus(submission.status)}
+                      <h3 className="font-semibold text-lg">{sub.assignment?.title || 'Assignment'}</h3>
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusBadgeColor(sub.status)}`}>
+                        {formatStatus(sub.status)}
                       </span>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
                       <div>
                         <span className="font-medium">Student:</span>
-                        <p className="text-foreground/80">{submission.student.name} ({submission.student.email})</p>
+                        <p className="text-foreground/80">{sub.student?.full_name || 'Unknown'} ({sub.student?.email || 'N/A'})</p>
                       </div>
                       <div>
-                        <span className="font-medium">Track & Cohort:</span>
-                        <p className="text-foreground/80">{submission.student.track} - {submission.student.cohort}</p>
-                      </div>
-                      <div>
-                        <span className="font-medium">Assignment:</span>
-                        <p className="text-foreground/80">Week {submission.assignment.week}: {submission.assignment.weekTitle}</p>
+                        <span className="font-medium">Track & Week:</span>
+                        <p className="text-foreground/80">Week {sub.assignment?.week?.week_number || 'N/A'}: {sub.assignment?.week?.title || 'N/A'}</p>
                       </div>
                       <div>
                         <span className="font-medium">Submitted:</span>
-                        <p className="text-foreground/80">{new Date(submission.submittedDate).toLocaleDateString()}</p>
+                        <p className="text-foreground/80">{new Date(sub.submitted_at).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Status:</span>
+                        <p className="text-foreground/80">{formatStatus(sub.status)}</p>
                       </div>
                     </div>
 
@@ -315,9 +499,9 @@ export default function SubmissionsPage() {
                     <div className="mb-4">
                       <span className="font-medium text-sm">Submission:</span>
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {submission.submission.github && (
+                        {sub.github_url && (
                           <a
-                            href={submission.submission.github}
+                            href={sub.github_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 px-3 py-1 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm"
@@ -325,9 +509,9 @@ export default function SubmissionsPage() {
                             GitHub <ExternalLink className="w-3 h-3" />
                           </a>
                         )}
-                        {submission.submission.demo && (
+                        {sub.demo_url && (
                           <a
-                            href={submission.submission.demo}
+                            href={sub.demo_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 px-3 py-1 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
@@ -336,33 +520,33 @@ export default function SubmissionsPage() {
                           </a>
                         )}
                       </div>
-                      {submission.submission.notes && (
+                      {sub.notes && (
                         <div className="mt-2">
                           <span className="font-medium text-sm">Notes:</span>
-                          <p className="text-foreground/80 text-sm mt-1">{submission.submission.notes}</p>
+                          <p className="text-foreground/80 text-sm mt-1">{sub.notes}</p>
                         </div>
                       )}
                     </div>
 
                     {/* Review Info */}
-                    {submission.reviewedBy && (
+                    {sub.reviewed_by && (
                       <div className="mb-4 p-3 bg-muted rounded-lg">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-sm">Reviewed by: {submission.reviewedBy}</span>
-                          {submission.reviewedDate && (
+                          <span className="font-medium text-sm">Reviewed by Admin</span>
+                          {sub.reviewed_at && (
                             <span className="text-xs text-foreground/60">
-                              {new Date(submission.reviewedDate).toLocaleDateString()}
+                              {new Date(sub.reviewed_at).toLocaleDateString()}
                             </span>
                           )}
                         </div>
-                        {submission.feedback && (
-                          <p className="text-foreground/80 text-sm">{submission.feedback}</p>
+                        {sub.feedback && (
+                          <p className="text-foreground/80 text-sm">{sub.feedback}</p>
                         )}
-                        {submission.grade && (
+                        {sub.grade && (
                           <div className="mt-2">
                             <span className="font-medium text-sm">Grade: </span>
                             <span className="px-2 py-1 bg-primary text-primary-foreground rounded text-sm">
-                              {submission.grade}
+                              {sub.grade}
                             </span>
                           </div>
                         )}
@@ -373,22 +557,22 @@ export default function SubmissionsPage() {
 
                 <div className="flex flex-col gap-2 ml-4">
                   <button
-                    onClick={() => handleReview(submission)}
+                    onClick={() => handleReview(sub)}
                     className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
                   >
                     Review
                   </button>
-                  {submission.status === "pending" && (
+                  {sub.status === "pending" && (
                     <>
                       <button
-                        onClick={() => handleQuickAction(submission.id, "approve")}
-                        className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
+                        onClick={() => handleQuickAction(sub.id, "approve")}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm flex items-center justify-center"
                       >
                         <ThumbsUp className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleQuickAction(submission.id, "reject")}
-                        className="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors text-sm"
+                        onClick={() => handleQuickAction(sub.id, "reject")}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm flex items-center justify-center"
                       >
                         <ThumbsDown className="w-4 h-4" />
                       </button>

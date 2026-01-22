@@ -1,76 +1,237 @@
 "use client"
 
-import { useState } from "react"
-import { Plus, Edit2, Trash2, Play, FileText, Calendar, ChevronDown, ChevronRight } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Plus, Edit2, Trash2, Play, FileText, ChevronDown, ChevronRight, X, Upload } from "lucide-react"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { getTracks, getAllWeeks, createWeek, updateWeek, deleteWeek, createLesson, updateLesson, deleteLesson, updateAssignment } from "@/lib/data"
+import { useToast } from "@/components/ui/toast"
 
-const mockWeeks = [
-  {
-    id: 1,
-    title: "React Fundamentals",
-    description: "Learn core React concepts including components, JSX, and hooks",
-    order: 1,
-    lessons: [
-      { id: 1, title: "Introduction to React", type: "video", duration: "15 min", order: 1 },
-      { id: 2, title: "JSX and Components", type: "video", duration: "20 min", order: 2 },
-      { id: 3, title: "Props and State", type: "text", order: 3 },
-      { id: 4, title: "React Hooks Basics", type: "video", duration: "25 min", order: 4 }
-    ],
-    assignment: {
-      id: 1,
-      title: "Build a Counter Component",
-      requirements: ["GitHub Repository", "Live Demo URL", "Additional Notes (optional)"]
+function AddTaskModal({
+  isOpen,
+  onClose,
+  onAdd,
+  editingTask,
+}: { isOpen: boolean; onClose: () => void; onAdd: (task: any) => void; editingTask?: any }) {
+  const [formData, setFormData] = useState({
+    title: "",
+    requirements: "",
+    guidelines: "",
+    videoGuide: "",
+    learningMaterials: [] as { type: "link" | "image"; value: string }[],
+  })
+  const [materialInput, setMaterialInput] = useState("")
+  const [materialType, setMaterialType] = useState<"link" | "image">("link")
+
+  // Update form data when editingTask changes
+  useEffect(() => {
+    if (editingTask) {
+      setFormData({
+        title: editingTask.title || "",
+        requirements: editingTask.requirements || "",
+        guidelines: editingTask.guidelines || editingTask.submission_guidelines || "",
+        videoGuide: editingTask.videoGuide || editingTask.video_guide || "",
+        learningMaterials: editingTask.learningMaterials || editingTask.learning_materials || [],
+      })
+    } else {
+      // Reset form for new task
+      setFormData({
+        title: "",
+        requirements: "",
+        guidelines: "",
+        videoGuide: "",
+        learningMaterials: [],
+      })
     }
-  },
-  {
-    id: 2,
-    title: "State Management",
-    description: "Master state management with Context API and custom hooks",
-    order: 2,
-    lessons: [
-      { id: 5, title: "Context API Deep Dive", type: "video", duration: "30 min", order: 1 },
-      { id: 6, title: "Custom Hooks", type: "video", duration: "25 min", order: 2 },
-      { id: 7, title: "State Management Patterns", type: "text", order: 3 }
-    ],
-    assignment: {
-      id: 2,
-      title: "Theme Context Provider",
-      requirements: ["GitHub Repository", "Live Demo URL"]
-    }
-  },
-  {
-    id: 3,
-    title: "Component Composition",
-    description: "Build reusable components and understand composition patterns",
-    order: 3,
-    lessons: [
-      { id: 8, title: "Component Patterns", type: "video", duration: "35 min", order: 1 },
-      { id: 9, title: "Render Props Pattern", type: "text", order: 2 },
-      { id: 10, title: "Compound Components", type: "video", duration: "28 min", order: 3 }
-    ],
-    assignment: {
-      id: 3,
-      title: "Reusable Modal Component",
-      requirements: ["GitHub Repository", "Live Demo URL", "Implementation Notes (optional)"]
+  }, [editingTask])
+
+  const handleAddMaterial = () => {
+    if (materialInput.trim()) {
+      setFormData({
+        ...formData,
+        learningMaterials: [...formData.learningMaterials, { type: materialType, value: materialInput }],
+      })
+      setMaterialInput("")
     }
   }
-]
 
-const TRACKS = [
-  { id: "frontend", name: "Frontend Development" },
-  { id: "backend", name: "Backend Development" },
-  { id: "devops", name: "DevOps / Cloud" },
-  { id: "data", name: "Data / AI / ML" },
-  { id: "web3", name: "Web3" }
-]
+  const handleRemoveMaterial = (index: number) => {
+    setFormData({
+      ...formData,
+      learningMaterials: formData.learningMaterials.filter((_: any, i: number) => i !== index),
+    })
+  }
+
+  const handleSubmit = () => {
+    if (formData.title.trim() && formData.requirements.trim() && formData.guidelines.trim()) {
+      onAdd(formData)
+      setFormData({ title: "", requirements: "", guidelines: "", videoGuide: "", learningMaterials: [] })
+      onClose()
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeInScale">
+      <div className="bg-card border border-border rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-slideInUp">
+        {/* Header */}
+        <div className="sticky top-0 bg-card border-b border-border p-6 flex items-center justify-between">
+          <h2 className="text-2xl font-bold">{editingTask ? "Edit Assignment" : "Add New Assignment"}</h2>
+          <button onClick={onClose} className="p-1 hover:bg-background rounded-lg transition-colors">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Form Content */}
+        <div className="p-6 space-y-6">
+          {/* Task Title */}
+          <div>
+            <label className="block text-sm font-semibold mb-2">Assignment Title *</label>
+            <input
+              type="text"
+              placeholder="e.g., Build a React Counter App"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="w-full px-4 py-3 rounded-lg bg-background border border-border text-foreground placeholder:text-foreground/40 focus:outline-none focus:border-primary transition-colors"
+            />
+          </div>
+
+          {/* Task Requirements */}
+          <div>
+            <label className="block text-sm font-semibold mb-2">Assignment Requirements *</label>
+            <textarea
+              placeholder="Describe what students need to learn and do for this assignment..."
+              value={formData.requirements}
+              onChange={(e) => setFormData({ ...formData, requirements: e.target.value })}
+              className="w-full h-24 px-4 py-3 rounded-lg bg-background border border-border text-foreground placeholder:text-foreground/40 focus:outline-none focus:border-primary transition-colors resize-none"
+            />
+            <p className="text-xs text-foreground/50 mt-1">Be clear and specific about what's expected</p>
+          </div>
+
+          {/* Submission Guidelines */}
+          <div>
+            <label className="block text-sm font-semibold mb-2">Submission Guidelines *</label>
+            <textarea
+              placeholder="How should students submit? What format? What should be included in their submission?"
+              value={formData.guidelines}
+              onChange={(e) => setFormData({ ...formData, guidelines: e.target.value })}
+              className="w-full h-24 px-4 py-3 rounded-lg bg-background border border-border text-foreground placeholder:text-foreground/40 focus:outline-none focus:border-primary transition-colors resize-none"
+            />
+            <p className="text-xs text-foreground/50 mt-1">
+              Include submission format, deadline, and evaluation criteria
+            </p>
+          </div>
+
+          {/* Video Guide */}
+          <div>
+            <label className="block text-sm font-semibold mb-2">Video Guide (Optional)</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Paste video URL or select video file..."
+                value={formData.videoGuide}
+                onChange={(e) => setFormData({ ...formData, videoGuide: e.target.value })}
+                className="flex-1 px-4 py-3 rounded-lg bg-background border border-border text-foreground placeholder:text-foreground/40 focus:outline-none focus:border-primary transition-colors"
+              />
+              <button className="px-4 py-3 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors flex items-center gap-2 whitespace-nowrap">
+                <Upload className="w-4 h-4" />
+                Upload
+              </button>
+            </div>
+            <p className="text-xs text-foreground/50 mt-1">YouTube links or uploaded video files</p>
+          </div>
+
+          {/* Learning Materials */}
+          <div>
+            <label className="block text-sm font-semibold mb-2">Learning Materials (Optional)</label>
+            <p className="text-xs text-foreground/50 mb-3">Add resources like documentation links, images, or files</p>
+
+            <div className="flex gap-2 mb-4">
+              <select
+                value={materialType}
+                onChange={(e) => setMaterialType(e.target.value as "link" | "image")}
+                className="px-4 py-2 rounded-lg bg-background border border-border text-foreground focus:outline-none focus:border-primary transition-colors"
+              >
+                <option value="link">Link</option>
+                <option value="image">Image</option>
+              </select>
+              <input
+                type="text"
+                placeholder={materialType === "link" ? "Paste URL..." : "Paste image URL or select file..."}
+                value={materialInput}
+                onChange={(e) => setMaterialInput(e.target.value)}
+                className="flex-1 px-4 py-2 rounded-lg bg-background border border-border text-foreground placeholder:text-foreground/40 focus:outline-none focus:border-primary transition-colors"
+              />
+              <button
+                onClick={handleAddMaterial}
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+              >
+                Add
+              </button>
+            </div>
+
+            {/* Materials List */}
+            {formData.learningMaterials.length > 0 && (
+              <div className="space-y-2">
+                {formData.learningMaterials.map((material: any, index: number) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 rounded-lg bg-background border border-border/50 hover:border-border transition-colors"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <span className="text-xs px-2 py-1 rounded bg-primary/20 text-primary font-semibold whitespace-nowrap">
+                        {material.type.toUpperCase()}
+                      </span>
+                      <span className="text-sm text-foreground/70 truncate">{material.value}</span>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveMaterial(index)}
+                      className="p-1 hover:bg-destructive/10 rounded transition-colors text-destructive flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-card border-t border-border p-6 flex gap-3 justify-end">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 rounded-lg bg-card border border-border hover:bg-background transition-colors font-semibold"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="px-6 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity font-semibold"
+          >
+            {editingTask ? "Update Assignment" : "Create Assignment"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function WeeksManagementPage() {
-  const [selectedTrack, setSelectedTrack] = useState("frontend")
-  const [expandedWeeks, setExpandedWeeks] = useState<number[]>([1])
+  const { user, loading: authLoading } = useAuth()
+  const { showToast } = useToast()
+  const [tracks, setTracks] = useState<any[]>([])
+  const [weeks, setWeeks] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedTrack, setSelectedTrack] = useState("")
+  const [expandedWeeks, setExpandedWeeks] = useState<string[]>([])
   const [showWeekForm, setShowWeekForm] = useState(false)
   const [showLessonForm, setShowLessonForm] = useState(false)
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false)
   const [editingWeek, setEditingWeek] = useState<any>(null)
   const [editingLesson, setEditingLesson] = useState<any>(null)
-  const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null)
+  const [editingAssignment, setEditingAssignment] = useState<any>(null)
+  const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null)
 
   const [weekForm, setWeekForm] = useState({
     title: "",
@@ -87,7 +248,43 @@ export default function WeeksManagementPage() {
     order: 1
   })
 
-  const toggleWeekExpansion = (weekId: number) => {
+  useEffect(() => {
+    async function loadData() {
+      if (!user?.id) return
+      
+      try {
+        const [tracksData, weeksData] = await Promise.all([
+          getTracks(),
+          getAllWeeks()
+        ])
+        
+        setTracks(tracksData)
+        setWeeks(weeksData.map(week => ({
+          ...week,
+          lessons: week.lessons ? week.lessons.sort((a: any, b: any) => a.order_index - b.order_index) : []
+        })))
+        
+        // Set first track as selected if none selected
+        if (tracksData.length > 0 && !selectedTrack) {
+          setSelectedTrack(tracksData[0].id)
+        }
+      } catch (error) {
+        console.error('Error loading data:', error)
+        setTracks([])
+        setWeeks([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!authLoading && user) {
+      loadData()
+    }
+  }, [user, authLoading, selectedTrack])
+
+  const filteredWeeks = weeks.filter(week => week.track_id === selectedTrack)
+
+  const toggleWeekExpansion = (weekId: string) => {
     setExpandedWeeks(prev => 
       prev.includes(weekId) 
         ? prev.filter(id => id !== weekId)
@@ -97,21 +294,122 @@ export default function WeeksManagementPage() {
 
   const handleWeekSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Saving week:", weekForm)
+    if (!selectedTrack) return
     
-    setWeekForm({ title: "", description: "", order: 1 })
-    setEditingWeek(null)
-    setShowWeekForm(false)
+    try {
+      if (editingWeek) {
+        await updateWeek(editingWeek.id, {
+          title: weekForm.title,
+          description: weekForm.description,
+          order_index: weekForm.order
+        })
+      } else {
+        await createWeek({
+          title: weekForm.title,
+          description: weekForm.description,
+          track_id: selectedTrack,
+          week_number: weekForm.order,
+          order_index: weekForm.order
+        })
+      }
+      
+      // Refresh weeks data
+      const weeksData = await getAllWeeks()
+      setWeeks(weeksData.map(week => ({
+        ...week,
+        lessons: week.lessons ? week.lessons.sort((a: any, b: any) => a.order_index - b.order_index) : []
+      })))
+      
+      setWeekForm({ title: "", description: "", order: 1 })
+      setEditingWeek(null)
+      setShowWeekForm(false)
+    } catch (error) {
+      console.error('Error saving week:', error)
+      alert('Failed to save week')
+    }
   }
 
   const handleLessonSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Saving lesson:", lessonForm, "for week:", selectedWeekId)
+    if (!selectedWeekId) {
+      console.error('No selectedWeekId for lesson creation')
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'Please select a week first.'
+      })
+      return
+    }
     
-    setLessonForm({ title: "", type: "video", duration: "", content: "", videoUrl: "", order: 1 })
-    setEditingLesson(null)
-    setShowLessonForm(false)
-    setSelectedWeekId(null)
+    try {
+      console.log('Submitting lesson:', { lessonForm, selectedWeekId, editingLesson })
+      
+      if (editingLesson) {
+        console.log('Updating existing lesson...')
+        const result = await updateLesson(editingLesson.id, {
+          title: lessonForm.title,
+          type: lessonForm.type as 'video' | 'text',
+          content: lessonForm.content,
+          video_url: lessonForm.videoUrl,
+          duration: lessonForm.duration,
+          order_index: lessonForm.order
+        })
+        console.log('Lesson update result:', result)
+        
+        showToast({
+          type: 'success',
+          title: 'Lesson Updated',
+          message: `"${lessonForm.title}" has been successfully updated.`
+        })
+      } else {
+        console.log('Creating new lesson...')
+        const result = await createLesson({
+          title: lessonForm.title,
+          type: lessonForm.type as 'video' | 'text',
+          content: lessonForm.content,
+          video_url: lessonForm.videoUrl,
+          duration: lessonForm.duration,
+          week_id: selectedWeekId,
+          order_index: lessonForm.order
+        })
+        
+        console.log('Lesson created successfully:', result)
+        
+        showToast({
+          type: 'success',
+          title: 'Lesson Created',
+          message: `"${lessonForm.title}" has been successfully created.`
+        })
+      }
+      
+      // Refresh weeks data
+      console.log('Refreshing weeks data...')
+      const weeksData = await getAllWeeks()
+      console.log('Refreshed weeks data after lesson creation:', weeksData)
+      console.log('Week with new lesson:', weeksData.find(w => w.id === selectedWeekId))
+      setWeeks(weeksData.map(week => ({
+        ...week,
+        lessons: week.lessons ? week.lessons.sort((a: any, b: any) => a.order_index - b.order_index) : []
+      })))
+      
+      setLessonForm({ title: "", type: "video", duration: "", content: "", videoUrl: "", order: 1 })
+      setEditingLesson(null)
+      setShowLessonForm(false)
+      setSelectedWeekId(null)
+    } catch (error: any) {
+      console.error('Error saving lesson:', error)
+      console.error('Error details:', {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint
+      })
+      showToast({
+        type: 'error',
+        title: 'Save Failed',
+        message: `Failed to save lesson: ${error?.message || 'Unknown error'}`
+      })
+    }
   }
 
   const handleEditWeek = (week: any) => {
@@ -119,17 +417,17 @@ export default function WeeksManagementPage() {
     setWeekForm({
       title: week.title,
       description: week.description,
-      order: week.order
+      order: week.order_index
     })
     setShowWeekForm(true)
   }
 
-  const handleAddLesson = (weekId: number) => {
+  const handleAddLesson = (weekId: string) => {
     setSelectedWeekId(weekId)
     setShowLessonForm(true)
   }
 
-  const handleEditLesson = (lesson: any, weekId: number) => {
+  const handleEditLesson = (lesson: any, weekId: string) => {
     setEditingLesson(lesson)
     setSelectedWeekId(weekId)
     setLessonForm({
@@ -137,10 +435,117 @@ export default function WeeksManagementPage() {
       type: lesson.type,
       duration: lesson.duration || "",
       content: lesson.content || "",
-      videoUrl: lesson.videoUrl || "",
-      order: lesson.order
+      videoUrl: lesson.video_url || "",
+      order: lesson.order_index
     })
     setShowLessonForm(true)
+  }
+
+  const handleEditAssignment = (assignment: any) => {
+    console.log('Editing assignment from weeks page:', assignment)
+    setEditingAssignment(assignment)
+    setShowAssignmentModal(true)
+  }
+
+  const handleUpdateAssignment = async (assignmentData: any) => {
+    if (!editingAssignment) return
+    
+    try {
+      console.log('Updating assignment:', editingAssignment.id, assignmentData)
+      
+      await updateAssignment(editingAssignment.id, {
+        title: assignmentData.title,
+        requirements: assignmentData.requirements,
+        submission_guidelines: assignmentData.guidelines,
+        video_guide: assignmentData.videoGuide,
+        learning_materials: assignmentData.learningMaterials
+      })
+      
+      // Refresh weeks data
+      const weeksData = await getAllWeeks()
+      setWeeks(weeksData.map(week => ({
+        ...week,
+        lessons: week.lessons ? week.lessons.sort((a: any, b: any) => a.order_index - b.order_index) : []
+      })))
+      
+      showToast({
+        type: 'success',
+        title: 'Assignment Updated',
+        message: `"${assignmentData.title}" has been successfully updated.`
+      })
+    } catch (error) {
+      console.error('Error updating assignment:', error)
+      showToast({
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Failed to update assignment. Please try again.'
+      })
+    }
+  }
+
+  const handleDeleteWeek = async (weekId: string, weekTitle: string) => {
+    if (!confirm(`Are you sure you want to delete "${weekTitle}"? This will also delete all lessons and assignments in this week.`)) {
+      return
+    }
+    
+    try {
+      await deleteWeek(weekId)
+      
+      // Refresh weeks data
+      const weeksData = await getAllWeeks()
+      setWeeks(weeksData.map(week => ({
+        ...week,
+        lessons: week.lessons ? week.lessons.sort((a: any, b: any) => a.order_index - b.order_index) : []
+      })))
+      
+      alert('Week deleted successfully!')
+    } catch (error) {
+      console.error('Error deleting week:', error)
+      alert('Failed to delete week. Please try again.')
+    }
+  }
+
+  const handleDeleteLesson = async (lessonId: string, lessonTitle: string) => {
+    if (!confirm(`Are you sure you want to delete "${lessonTitle}"?`)) {
+      return
+    }
+    
+    try {
+      await deleteLesson(lessonId)
+      
+      // Refresh weeks data
+      const weeksData = await getAllWeeks()
+      setWeeks(weeksData.map(week => ({
+        ...week,
+        lessons: week.lessons ? week.lessons.sort((a: any, b: any) => a.order_index - b.order_index) : []
+      })))
+      
+      alert('Lesson deleted successfully!')
+    } catch (error) {
+      console.error('Error deleting lesson:', error)
+      alert('Failed to delete lesson. Please try again.')
+    }
+  }
+
+  if (authLoading || loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-7xl">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
+          <div className="flex gap-2 mb-8">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-10 bg-muted rounded w-32"></div>
+            ))}
+          </div>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-32 bg-muted rounded-xl"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -163,7 +568,7 @@ export default function WeeksManagementPage() {
 
         {/* Track Selector */}
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {TRACKS.map(track => (
+          {tracks.map(track => (
             <button
               key={track.id}
               onClick={() => setSelectedTrack(track.id)}
@@ -181,7 +586,7 @@ export default function WeeksManagementPage() {
 
       {/* Weeks List */}
       <div className="space-y-4">
-        {mockWeeks.map(week => (
+        {filteredWeeks.map(week => (
           <div key={week.id} className="bg-card border border-border rounded-lg overflow-hidden">
             {/* Week Header */}
             <div className="p-6 border-b border-border">
@@ -198,11 +603,11 @@ export default function WeeksManagementPage() {
                     )}
                   </button>
                   <div>
-                    <h3 className="text-xl font-semibold">Week {week.order}: {week.title}</h3>
+                    <h3 className="text-xl font-semibold">Week {week.week_number}: {week.title}</h3>
                     <p className="text-foreground/60">{week.description}</p>
                     <div className="flex items-center gap-4 mt-2 text-sm text-foreground/60">
-                      <span>{week.lessons.length} lessons</span>
-                      <span>1 assignment</span>
+                      <span>{week.lessons?.length || 0} lessons</span>
+                      <span>{week.assignments?.length || 0} assignments</span>
                     </div>
                   </div>
                 </div>
@@ -213,7 +618,10 @@ export default function WeeksManagementPage() {
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button className="p-2 text-accent hover:bg-accent/10 rounded-lg transition-colors">
+                  <button
+                    onClick={() => handleDeleteWeek(week.id, week.title)}
+                    className="p-2 text-accent hover:bg-accent/10 rounded-lg transition-colors"
+                  >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -237,7 +645,7 @@ export default function WeeksManagementPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    {week.lessons.map(lesson => (
+                    {(week.lessons || []).map((lesson: any) => (
                       <div key={lesson.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                         <div className="flex items-center gap-3">
                           {lesson.type === "video" ? (
@@ -253,14 +661,17 @@ export default function WeeksManagementPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-foreground/60">Order: {lesson.order}</span>
+                          <span className="text-xs text-foreground/60">Order: {lesson.order_index}</span>
                           <button
                             onClick={() => handleEditLesson(lesson, week.id)}
                             className="p-1 text-foreground/60 hover:text-foreground hover:bg-background rounded transition-colors"
                           >
                             <Edit2 className="w-3 h-3" />
                           </button>
-                          <button className="p-1 text-accent hover:bg-accent/10 rounded transition-colors">
+                          <button
+                            onClick={() => handleDeleteLesson(lesson.id, lesson.title)}
+                            className="p-1 text-accent hover:bg-accent/10 rounded transition-colors"
+                          >
                             <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
@@ -269,27 +680,128 @@ export default function WeeksManagementPage() {
                   </div>
                 </div>
 
-                {/* Assignment */}
+                {/* Assignments */}
                 <div>
-                  <h4 className="font-semibold mb-4">Assignment</h4>
-                  <div className="p-4 bg-muted rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h5 className="font-medium">{week.assignment.title}</h5>
-                        <p className="text-sm text-foreground/60">
-                          {week.assignment.requirements.length} requirements
-                        </p>
+                  <h4 className="font-semibold mb-4">Assignments</h4>
+                  <div className="space-y-2">
+                    {(week.assignments || []).map((assignment: any) => (
+                      <div key={assignment.id} className="p-4 bg-muted rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <h5 className="font-medium mb-2">{assignment.title}</h5>
+                            
+                            {/* Requirements */}
+                            {assignment.requirements && (
+                              <div className="mb-2">
+                                <p className="text-xs font-semibold text-foreground/80 mb-1">Requirements:</p>
+                                <p className="text-sm text-foreground/70 line-clamp-2">{assignment.requirements}</p>
+                              </div>
+                            )}
+                            
+                            {/* Submission Guidelines */}
+                            {assignment.submission_guidelines && (
+                              <div className="mb-2">
+                                <p className="text-xs font-semibold text-foreground/80 mb-1">Submission Guidelines:</p>
+                                <p className="text-sm text-foreground/70 line-clamp-2">{assignment.submission_guidelines}</p>
+                              </div>
+                            )}
+                            
+                            {/* Video Guide */}
+                            {assignment.video_guide && (
+                              <div className="mb-2">
+                                <p className="text-xs font-semibold text-foreground/80 mb-1">Video Guide:</p>
+                                <a 
+                                  href={assignment.video_guide} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-400 hover:text-blue-300 underline"
+                                >
+                                  Watch Video Guide
+                                </a>
+                              </div>
+                            )}
+                            
+                            {/* Learning Materials */}
+                            {assignment.learning_materials && assignment.learning_materials.length > 0 && (
+                              <div className="mb-2">
+                                <p className="text-xs font-semibold text-foreground/80 mb-1">Learning Materials:</p>
+                                <div className="space-y-1">
+                                  {assignment.learning_materials.map((material: any, idx: number) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                      <span className="text-xs px-2 py-1 rounded bg-primary/20 text-primary">
+                                        {material.type.toUpperCase()}
+                                      </span>
+                                      <a 
+                                        href={material.value} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-blue-400 hover:text-blue-300 underline truncate"
+                                      >
+                                        {material.type === 'link' ? 'Open Link' : 'View Image'}
+                                      </a>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Status indicators */}
+                            <div className="flex gap-2 mt-2 flex-wrap">
+                              {assignment.requirements && (
+                                <span className="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400">
+                                  Has Requirements
+                                </span>
+                              )}
+                              {assignment.submission_guidelines && (
+                                <span className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400">
+                                  Has Guidelines
+                                </span>
+                              )}
+                              {assignment.video_guide && (
+                                <span className="text-xs px-2 py-1 rounded bg-purple-500/20 text-purple-400">
+                                  Has Video
+                                </span>
+                              )}
+                              {assignment.learning_materials && assignment.learning_materials.length > 0 && (
+                                <span className="text-xs px-2 py-1 rounded bg-yellow-500/20 text-yellow-400">
+                                  {assignment.learning_materials.length} Materials
+                                </span>
+                              )}
+                              {assignment.deadline && (
+                                <span className="text-xs px-2 py-1 rounded bg-orange-500/20 text-orange-400">
+                                  Has Deadline
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <button 
+                            onClick={() => handleEditAssignment(assignment)}
+                            className="p-2 text-foreground/60 hover:text-foreground hover:bg-background rounded-lg transition-colors flex-shrink-0"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                      <button className="p-2 text-foreground/60 hover:text-foreground hover:bg-background rounded-lg transition-colors">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    ))}
+                    {(!week.assignments || week.assignments.length === 0) && (
+                      <div className="p-4 bg-muted rounded-lg text-center text-foreground/60">
+                        No assignments yet. Create assignments from the Tracks page.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
           </div>
         ))}
+        
+        {filteredWeeks.length === 0 && (
+          <div className="text-center py-12 text-foreground/60">
+            <p>No weeks found for the selected track.</p>
+            <p className="text-sm mt-2">Add a new week to get started.</p>
+          </div>
+        )}
       </div>
 
       {/* Week Form Modal */}
@@ -329,8 +841,8 @@ export default function WeeksManagementPage() {
                 <label className="block font-medium mb-2">Order *</label>
                 <input
                   type="number"
-                  value={weekForm.order}
-                  onChange={(e) => setWeekForm(prev => ({ ...prev, order: parseInt(e.target.value) }))}
+                  value={weekForm.order || ''}
+                  onChange={(e) => setWeekForm(prev => ({ ...prev, order: parseInt(e.target.value) || 0 }))}
                   min="1"
                   className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   required
@@ -471,6 +983,17 @@ export default function WeeksManagementPage() {
           </div>
         </div>
       )}
+
+      {/* Assignment Edit Modal */}
+      <AddTaskModal 
+        isOpen={showAssignmentModal} 
+        onClose={() => {
+          setShowAssignmentModal(false)
+          setEditingAssignment(null)
+        }} 
+        onAdd={handleUpdateAssignment}
+        editingTask={editingAssignment}
+      />
     </div>
   )
 }
