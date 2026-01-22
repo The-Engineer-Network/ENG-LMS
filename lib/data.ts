@@ -430,8 +430,15 @@ export async function getAdminDashboardData() {
 }
 
 export async function getStudentDashboardData(userId: string) {
+  console.log('getStudentDashboardData called for userId:', userId)
+  
   const enrollment = await getStudentEnrollment(userId)
-  if (!enrollment) return null
+  console.log('Student enrollment result:', enrollment)
+  
+  if (!enrollment) {
+    console.log('No enrollment found for user:', userId)
+    return null
+  }
 
   const weekProgress = await getStudentWeekProgress(userId)
   const weeks = await getWeeksByTrack(enrollment.track_id)

@@ -36,19 +36,79 @@ export async function signUp(email: string, password: string, fullName: string, 
   if (authError) throw authError
 
   if (authData.user) {
-    // Create student enrollment
-    const { error: enrollmentError } = await supabase
+    console.log('User created successfully:', authData.user.id)
+    
+    // Wait for profile creation and automatic enrollment trigger to complete
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    // Check if enrollment was created automatically by the trigger
+    let enrollmentCheck = await supabase
       .from('student_enrollments')
-      .insert({
-        user_id: authData.user.id,
-        track_id: trackId,
-        cohort_id: cohortId,
-        progress_percentage: 0,
-        tasks_completed: 0,
-        total_tasks: 20
-      })
+      .select('*')
+      .eq('user_id', authData.user.id)
+      .eq('track_id', trackId)
+      .eq('cohort_id', cohortId)
+      .single()
 
-    if (enrollmentError) throw enrollmentError
+    if (enrollmentCheck.error || !enrollmentCheck.data) {
+      console.log('Automatic enrollment not found, creating manually...')
+      
+      // Fallback: Create enrollment manually if trigger didn't work
+      const { data: enrollmentData, error: enrollmentError } = await supabase
+        .from('student_enrollments')
+        .insert({
+          user_id: authData.user.id,
+          track_id: trackId,
+          cohort_id: cohortId,
+          progress_percentage: 0,
+          tasks_completed: 0,
+          total_tasks: 20,
+          enrolled_at: new Date().toISOString(),
+          status: 'active'
+        })
+        .select()
+        .single()
+
+      if (enrollmentError) {
+        console.error('Failed to create manual enrollment:', enrollmentError)
+        throw new Error(`Failed to create enrollment: ${enrollmentError.message}. Your account was created but enrollment failed. Please contact support.`)
+      }
+
+      console.log('Manual enrollment created successfully:', enrollmentData)
+      
+      // Initialize week progress manually
+      try {
+        const { data: weeks } = await supabase
+          .from('weeks')
+          .select('id, week_number, order_index')
+          .eq('track_id', trackId)
+          .order('order_index')
+
+        if (weeks && weeks.length > 0) {
+          const weekProgressData = weeks.map((week, index) => ({
+            student_id: authData.user.id,
+            week_id: week.id,
+            status: index === 0 ? 'pending' : 'locked',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }))
+
+          const { error: progressError } = await supabase
+            .from('week_progress')
+            .insert(weekProgressData)
+          
+          if (progressError) {
+            console.warn('Failed to initialize week progress:', progressError)
+          } else {
+            console.log('Week progress initialized successfully')
+          }
+        }
+      } catch (progressInitError) {
+        console.warn('Error initializing week progress:', progressInitError)
+      }
+    } else {
+      console.log('Automatic enrollment found:', enrollmentCheck.data)
+    }
   }
 
   return authData
