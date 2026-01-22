@@ -205,7 +205,6 @@ export default function WhitelistPage() {
       })
     }
   }
-  }
 
   const exportWhitelist = () => {
     const csvContent = [
