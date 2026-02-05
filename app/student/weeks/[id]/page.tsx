@@ -21,10 +21,15 @@ export default function WeekDetailPage() {
       if (!user?.id || !weekId) return
       
       try {
+        console.log('Loading week detail for weekId:', weekId)
         const [weekData, progressData] = await Promise.all([
           getWeekById(weekId),
           getStudentWeekProgress(user.id)
         ])
+        
+        console.log('Week data received:', weekData)
+        console.log('Lessons in week:', weekData?.lessons?.length || 0)
+        console.log('Lessons:', weekData?.lessons)
         
         setWeek(weekData)
         const weekProgress = progressData.find((p: any) => p.week_id === weekId)

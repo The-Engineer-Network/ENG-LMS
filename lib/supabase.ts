@@ -1,9 +1,36 @@
+'use client'
+
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+console.log('🔧 Supabase client initialization')
+console.log('URL:', supabaseUrl)
+console.log('Key exists:', !!supabaseAnonKey)
+console.log('Key length:', supabaseAnonKey?.length)
+console.log('Running on:', typeof window !== 'undefined' ? 'client' : 'server')
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ CRITICAL: Supabase credentials are missing!')
+  console.error('URL:', supabaseUrl)
+  console.error('Key:', supabaseAnonKey ? 'exists' : 'MISSING')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+  global: {
+    headers: {
+      'x-client-info': 'supabase-js-web'
+    }
+  }
+})
+
+console.log('✅ Supabase client created:', typeof supabase)
+console.log('Has rpc method:', typeof supabase.rpc === 'function')
 
 // Database types matching our schema
 export interface User {

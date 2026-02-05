@@ -7,7 +7,6 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { GraduationCap, Mail, Lock, LogIn, ArrowLeft, AlertCircle, User, Shield } from "lucide-react"
 import { signIn } from "../../lib/auth"
-import { supabase } from "../../lib/supabase"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -38,62 +37,82 @@ export default function LoginPage() {
       if (data?.user) {
         console.log('User signed in:', data.user.id, data.user.email)
         
-        // Get user profile to determine role
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single()
-
-        console.log('Profile lookup result:', profile, profileError)
-
-        // If profile exists, use the role
-        if (profile) {
-          console.log('User role:', profile.role)
-          if (profile.role === 'admin') {
-            console.log('Redirecting to admin dashboard')
-            router.push("/admin/dashboard")
-          } else {
-            console.log('Redirecting to student dashboard')
-            router.push("/student/dashboard")
+        // Get user profile to determine role using direct HTTP fetch
+        try {
+          const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+          const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+          
+          if (!url || !key) {
+            throw new Error('Missing Supabase credentials')
           }
-        } else if (profileError && profileError.code !== 'PGRST116') {
-          // PGRST116 is "no rows returned" - that's expected if no profile
-          // Any other error means there's a real problem
+          
+          const profileRes = await fetch(
+            `${url}/rest/v1/profiles?id=eq.${data.user.id}&select=role`,
+            {
+              headers: {
+                'apikey': key,
+                'Authorization': `Bearer ${key}`
+              }
+            }
+          )
+          
+          const profiles = await profileRes.json()
+          const profile = Array.isArray(profiles) && profiles.length > 0 ? profiles[0] : null
+          
+          console.log('Profile lookup result:', profile)
+
+          // If profile exists, use the role
+          if (profile?.role) {
+            console.log('User role:', profile.role)
+            if (profile.role === 'admin') {
+              console.log('Redirecting to admin dashboard')
+              router.push("/admin/dashboard")
+            } else {
+              console.log('Redirecting to student dashboard')
+              router.push("/student/dashboard")
+            }
+          } else {
+            console.log('No profile found, creating one')
+            // If no profile exists, create one
+            const role = data.user.email?.includes('admin') ? 'admin' : 'student'
+            
+            // Try to create missing profile
+            const createRes = await fetch(`${url}/rest/v1/profiles`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': key,
+                'Authorization': `Bearer ${key}`,
+                'Prefer': 'return=minimal'
+              },
+              body: JSON.stringify({
+                id: data.user.id,
+                email: data.user.email,
+                full_name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+                role: role
+              })
+            })
+
+            // If profile already exists (409 conflict), that's fine - just proceed
+            if (!createRes.ok && createRes.status !== 409) {
+              console.error('Error creating profile:', await createRes.text())
+              setError("Error setting up user profile. Please contact support.")
+              setLoading(false)
+              return
+            }
+            
+            console.log('Profile created or already exists, redirecting...')
+            if (role === 'admin') {
+              router.push("/admin/dashboard")
+            } else {
+              router.push("/student/dashboard")
+            }
+          }
+        } catch (profileError: any) {
           console.error('Profile lookup error:', profileError)
           setError("Error accessing user profile. Please try again.")
           setLoading(false)
           return
-        } else {
-          console.log('No profile found, checking if admin user')
-          // If no profile exists, this shouldn't happen with our trigger
-          // But let's handle it gracefully
-          const role = data.user.email?.includes('admin') ? 'admin' : 'student'
-          
-          // Try to create missing profile
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-              id: data.user.id,
-              email: data.user.email,
-              full_name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
-              role: role
-            })
-
-          // If profile already exists (duplicate key error), that's fine - just proceed
-          if (insertError && insertError.code !== '23505') {
-            console.error('Error creating profile:', insertError)
-            setError("Error setting up user profile. Please contact support.")
-            setLoading(false)
-            return
-          }
-          
-          console.log('Profile created or already exists, redirecting...')
-          if (role === 'admin') {
-            router.push("/admin/dashboard")
-          } else {
-            router.push("/student/dashboard")
-          }
         }
       } else {
         console.error('No user data returned from signIn')

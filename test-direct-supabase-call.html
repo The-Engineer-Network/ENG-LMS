@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Supabase Connection</title>
+</head>
+<body>
+  <h1>Supabase Connection Test</h1>
+  <button onclick="testConnection()">Test Connection</button>
+  <button onclick="testRPC()">Test RPC</button>
+  <button onclick="testInsert()">Test Insert</button>
+  <pre id="output"></pre>
+
+  <script>
+    // Replace these with your actual values from .env.local
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE'
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE'
+
+    function log(message) {
+      const output = document.getElementById('output')
+      output.textContent += message + '\n'
+      console.log(message)
+    }
+
+    async function testConnection() {
+      log('Testing basic connection...')
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/tracks?select=id,name&limit=1`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          }
+        })
+        const data = await response.json()
+        log('Connection successful!')
+        log(JSON.stringify(data, null, 2))
+      } catch (error) {
+        log('Connection failed: ' + error.message)
+      }
+    }
+
+    async function testRPC() {
+      log('\nTesting RPC call...')
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/create_lesson_rpc`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            lesson_data: {
+              title: 'TEST LESSON',
+              type: 'video',
+              content: '',
+              video_url: '',
+              duration: '',
+              week_id: 'adc6b1b7-ff68-4140-bb75-d4dd1a43bc0c',
+              order_index: 1
+            }
+          })
+        })
+        const data = await response.json()
+        log('RPC successful!')
+        log(JSON.stringify(data, null, 2))
+      } catch (error) {
+        log('RPC failed: ' + error.message)
+      }
+    }
+
+    async function testInsert() {
+      log('\nTesting direct insert...')
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/lessons`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            title: 'TEST LESSON DIRECT',
+            type: 'video',
+            content: '',
+            video_url: '',
+            duration: '',
+            week_id: 'adc6b1b7-ff68-4140-bb75-d4dd1a43bc0c',
+            order_index: 1
+          })
+        })
+        const data = await response.json()
+        log('Insert successful!')
+        log(JSON.stringify(data, null, 2))
+      } catch (error) {
+        log('Insert failed: ' + error.message)
+      }
+    }
+  </script>
+</body>
+</html>

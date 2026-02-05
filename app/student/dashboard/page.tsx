@@ -14,48 +14,58 @@ export default function StudentDashboard() {
   const [viewMode, setViewMode] = useState<'overview' | 'timeline'>('overview')
 
   useEffect(() => {
+    let mounted = true
+    let retryCount = 0
+    const maxRetries = 2
+    
     async function loadDashboardData() {
       if (!user?.id) return
       
       try {
+        console.log('Loading dashboard data...')
+        const startTime = Date.now()
+        
         const [data, achievementsData] = await Promise.all([
           getStudentDashboardData(user.id),
           getStudentAchievements(user.id)
         ])
-        setDashboardData(data)
-        setAchievements(achievementsData || [])
+        
+        const loadTime = Date.now() - startTime
+        console.log(`Dashboard data loaded in ${loadTime}ms`)
+        
+        if (mounted) {
+          setDashboardData(data)
+          setAchievements(achievementsData || [])
+          setLoading(false)
+        }
       } catch (error) {
         console.error('Error loading dashboard data:', error)
-      } finally {
-        setLoading(false)
+        
+        // Retry logic for network errors
+        if (retryCount < maxRetries && mounted) {
+          retryCount++
+          console.log(`Retrying... (${retryCount}/${maxRetries})`)
+          setTimeout(() => loadDashboardData(), 1000 * retryCount)
+        } else if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
     if (!authLoading && user) {
       loadDashboardData()
+    } else if (!authLoading && !user) {
+      setLoading(false)
     }
-  }, [user, authLoading])
+    
+    return () => {
+      mounted = false
+    }
+  }, [user?.id, authLoading])
 
   const completionPercentage = useMemo(() => dashboardData?.student?.progress || 0, [dashboardData])
 
-  // Calculate streak and performance metrics
-  const performanceMetrics = useMemo(() => {
-    if (!dashboardData) return null
-    
-    const { weeks } = dashboardData
-    const approvedWeeks = weeks.filter((w: any) => w.status === 'Approved')
-    const streak = calculateStreak(weeks)
-    const weeklyProgress = calculateWeeklyProgress(weeks)
-    
-    return {
-      streak,
-      weeklyProgress,
-      averageGrade: 85, // This would come from actual grades
-      consistency: Math.round((approvedWeeks.length / weeks.length) * 100)
-    }
-  }, [dashboardData])
-
-  // Helper functions
+  // Helper functions (defined before use)
   const calculateStreak = (weeks: any[]) => {
     let streak = 0
     for (let i = weeks.length - 1; i >= 0; i--) {
@@ -76,17 +86,73 @@ export default function StudentDashboard() {
     }))
   }
 
+  // Calculate streak and performance metrics
+  const performanceMetrics = useMemo(() => {
+    if (!dashboardData) return null
+    
+    const { weeks } = dashboardData
+    const approvedWeeks = weeks.filter((w: any) => w.status === 'Approved')
+    const streak = calculateStreak(weeks)
+    const weeklyProgress = calculateWeeklyProgress(weeks)
+    
+    return {
+      streak,
+      weeklyProgress,
+      averageGrade: 85, // This would come from actual grades
+      consistency: Math.round((approvedWeeks.length / weeks.length) * 100)
+    }
+  }, [dashboardData])
+
   if (authLoading || loading) {
     return (
       <div className="p-4 md:p-8 max-w-7xl mx-auto">
-        <div className="animate-pulse">
-          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
-          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-muted rounded-xl"></div>
-            ))}
+        {/* Header Skeleton */}
+        <div className="mb-6 md:mb-8 animate-pulse">
+          <div className="h-8 bg-muted rounded w-64 mb-2"></div>
+          <div className="h-4 bg-muted rounded w-96 mb-4"></div>
+        </div>
+        
+        {/* Stats Grid Skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="p-6 rounded-xl bg-card border border-border animate-pulse">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="h-3 bg-muted rounded w-20 mb-3"></div>
+                  <div className="h-8 bg-muted rounded w-12 mb-2"></div>
+                  <div className="h-2 bg-muted rounded w-16"></div>
+                </div>
+                <div className="w-12 h-12 bg-muted rounded-lg"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Progress Bar Skeleton */}
+        <div className="mb-8 p-6 rounded-xl bg-card border border-border animate-pulse">
+          <div className="flex items-center justify-between mb-4">
+            <div className="h-6 bg-muted rounded w-40"></div>
+            <div className="h-8 bg-muted rounded w-16"></div>
           </div>
+          <div className="w-full h-4 bg-muted rounded-full mb-4"></div>
+          <div className="h-3 bg-muted rounded w-64"></div>
+        </div>
+        
+        {/* Weeks List Skeleton */}
+        <div className="space-y-3">
+          <div className="h-6 bg-muted rounded w-32 mb-4"></div>
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="p-4 rounded-xl bg-card border border-border animate-pulse">
+              <div className="flex items-center gap-4">
+                <div className="w-5 h-5 bg-muted rounded-full"></div>
+                <div className="flex-1">
+                  <div className="h-5 bg-muted rounded w-48 mb-2"></div>
+                  <div className="h-3 bg-muted rounded w-32"></div>
+                </div>
+                <div className="h-6 bg-muted rounded-full w-24"></div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     )
@@ -274,7 +340,7 @@ export default function StudentDashboard() {
             {dashboardData.weeks.map((week: any, i: number) => (
               <Link
                 key={week.week}
-                href={week.locked ? "#" : `/student/weeks/${week.week}`}
+                href={week.locked ? "#" : `/student/weeks/${week.id || week.week}`}
                 className={`p-4 rounded-xl border transition-all transform hover:scale-102 ${
                   week.locked
                     ? "bg-card/50 border-border/50 cursor-not-allowed opacity-60"
@@ -350,7 +416,7 @@ export default function StudentDashboard() {
                   {/* Timeline Content */}
                   <div className="flex-1 pb-6">
                     <Link
-                      href={week.locked ? "#" : `/student/weeks/${week.week}`}
+                      href={week.locked ? "#" : `/student/weeks/${week.id || week.week}`}
                       className={`block p-4 rounded-xl border transition-all ${
                         week.locked
                           ? "bg-card/50 border-border/50 cursor-not-allowed opacity-60"

@@ -138,6 +138,62 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Make all buttons more visible with cursor pointer */
+  button {
+    @apply cursor-pointer;
+  }
+  
+  button:disabled {
+    @apply cursor-not-allowed;
+  }
+}
+
+/* Enhanced button styles - make colors bolder and more visible */
+@layer components {
+  /* Primary buttons - make them stand out more */
+  .bg-primary {
+    background-color: hsl(from var(--primary) h s calc(l * 0.85)) !important;
+  }
+  
+  .bg-primary:hover:not(:disabled) {
+    background-color: hsl(from var(--primary) h s calc(l * 0.75)) !important;
+  }
+  
+  /* Secondary buttons */
+  .bg-secondary {
+    background-color: hsl(from var(--secondary) h s calc(l * 0.85)) !important;
+  }
+  
+  .bg-secondary:hover:not(:disabled) {
+    background-color: hsl(from var(--secondary) h s calc(l * 0.75)) !important;
+  }
+  
+  /* Accent buttons */
+  .bg-accent {
+    background-color: hsl(from var(--accent) h s calc(l * 0.85)) !important;
+  }
+  
+  .bg-accent:hover:not(:disabled) {
+    background-color: hsl(from var(--accent) h s calc(l * 0.75)) !important;
+  }
+  
+  /* Make button text more visible */
+  .text-primary-foreground,
+  .text-secondary-foreground,
+  .text-accent-foreground {
+    color: #ffffff !important;
+    font-weight: 600;
+  }
+  
+  /* Ensure all interactive elements have cursor pointer */
+  a, button, [role="button"], input[type="submit"], input[type="button"] {
+    cursor: pointer;
+  }
+  
+  a:disabled, button:disabled, [role="button"]:disabled {
+    cursor: not-allowed;
+  }
 }
 
 /* Custom animations */

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Direct Supabase Test</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>Direct Supabase Connection Test</h1>
+  <button onclick="testConnection()">Test Connection</button>
+  <button onclick="testInsert()">Test Insert</button>
+  <pre id="output"></pre>
+
+  <script>
+    // REPLACE THESE WITH YOUR ACTUAL VALUES FROM .env.local
+    const SUPABASE_URL = 'https://fimgtjjepxenaaznhfkc.supabase.co'
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbWd0amplcHhlbmFhem5oZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1NTY3MTgsImV4cCI6MjA4NDEzMjcxOH0.29KLZ52717z8hYrWN7mOHGzXOv8uB5fHYrhUKPR_rMQ' // Get this from your .env.local file
+
+    const { createClient } = supabase
+    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    function log(message) {
+      const output = document.getElementById('output')
+      output.textContent += message + '\n'
+      console.log(message)
+    }
+
+    async function testConnection() {
+      log('Testing connection to Supabase...')
+      try {
+        const { data, error } = await client
+          .from('tracks')
+          .select('id, name')
+          .limit(1)
+        
+        if (error) {
+          log('ERROR: ' + JSON.stringify(error, null, 2))
+        } else {
+          log('SUCCESS! Got data: ' + JSON.stringify(data, null, 2))
+        }
+      } catch (err) {
+        log('EXCEPTION: ' + err.message)
+      }
+    }
+
+    async function testInsert() {
+      log('\nTesting insert to lessons table...')
+      try {
+        const { data, error } = await client
+          .from('lessons')
+          .insert({
+            title: 'TEST LESSON FROM HTML',
+            type: 'video',
+            content: '',
+            video_url: 'https://www.youtube.com/watch?v=test',
+            duration: '10:00',
+            week_id: '232be0dc-b01b-41b3-a1a5-7b486656a04f', // Valid week ID
+            order_index: 999
+          })
+          .select()
+        
+        if (error) {
+          log('ERROR: ' + JSON.stringify(error, null, 2))
+        } else {
+          log('SUCCESS! Created lesson: ' + JSON.stringify(data, null, 2))
+          log('\n✅ LESSON CREATION WORKS! The issue was the invalid week_id.')
+        }
+      } catch (err) {
+        log('EXCEPTION: ' + err.message)
+      }
+    }
+  </script>
+</body>
+</html>

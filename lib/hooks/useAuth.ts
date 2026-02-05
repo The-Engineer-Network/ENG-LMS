@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../supabase'
+import { supabase } from '../supabase-fixed'
 import { getCurrentUser, type AuthUser } from '../auth'
 
 export function useAuth() {
@@ -9,26 +9,35 @@ export function useAuth() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let mounted = true
+
     // Get initial session
     getCurrentUser().then((user) => {
-      setUser(user)
-      setLoading(false)
+      if (mounted) {
+        setUser(user)
+        setLoading(false)
+      }
     })
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return
+        
         if (session?.user) {
           const user = await getCurrentUser()
-          setUser(user)
+          if (mounted) setUser(user)
         } else {
-          setUser(null)
+          if (mounted) setUser(null)
         }
-        setLoading(false)
+        if (mounted) setLoading(false)
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   return { user, loading }

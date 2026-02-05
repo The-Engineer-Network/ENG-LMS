@@ -5,6 +5,8 @@ import { Plus, Edit2, Trash2, Play, FileText, ChevronDown, ChevronRight, X, Uplo
 import { useAuth } from "@/lib/hooks/useAuth"
 import { getTracks, getAllWeeks, createWeek, updateWeek, deleteWeek, createLesson, updateLesson, deleteLesson, updateAssignment } from "@/lib/data"
 import { useToast } from "@/components/ui/toast"
+import { MultiVideoInput } from "@/components/MultiVideoInput"
+import { MultiLinkInput } from "@/components/MultiLinkInput"
 
 function AddTaskModal({
   isOpen,
@@ -232,6 +234,7 @@ export default function WeeksManagementPage() {
   const [editingLesson, setEditingLesson] = useState<any>(null)
   const [editingAssignment, setEditingAssignment] = useState<any>(null)
   const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null)
+  const [savingLesson, setSavingLesson] = useState(false)
 
   const [weekForm, setWeekForm] = useState({
     title: "",
@@ -245,6 +248,8 @@ export default function WeeksManagementPage() {
     duration: "",
     content: "",
     videoUrl: "",
+    videoUrls: [] as Array<{ url: string; title: string; duration?: string }>,
+    resourceLinks: [] as Array<{ url: string; title: string; description?: string }>,
     order: 1
   })
 
@@ -341,19 +346,29 @@ export default function WeeksManagementPage() {
       return
     }
     
+    setSavingLesson(true)
+    
     try {
-      console.log('Submitting lesson:', { lessonForm, selectedWeekId, editingLesson })
+      console.log('=== LESSON SUBMISSION DEBUG ===')
+      console.log('lessonForm.videoUrls:', JSON.stringify(lessonForm.videoUrls, null, 2))
+      console.log('lessonForm.resourceLinks:', JSON.stringify(lessonForm.resourceLinks, null, 2))
+      console.log('Full lessonForm:', lessonForm)
       
       if (editingLesson) {
         console.log('Updating existing lesson...')
-        const result = await updateLesson(editingLesson.id, {
+        const updateData = {
           title: lessonForm.title,
           type: lessonForm.type as 'video' | 'text',
           content: lessonForm.content,
           video_url: lessonForm.videoUrl,
+          video_urls: lessonForm.videoUrls,
+          resource_links: lessonForm.resourceLinks,
           duration: lessonForm.duration,
           order_index: lessonForm.order
-        })
+        }
+        console.log('Update data being sent:', JSON.stringify(updateData, null, 2))
+        
+        const result = await updateLesson(editingLesson.id, updateData)
         console.log('Lesson update result:', result)
         
         showToast({
@@ -363,15 +378,20 @@ export default function WeeksManagementPage() {
         })
       } else {
         console.log('Creating new lesson...')
-        const result = await createLesson({
+        const createData = {
           title: lessonForm.title,
           type: lessonForm.type as 'video' | 'text',
           content: lessonForm.content,
           video_url: lessonForm.videoUrl,
+          video_urls: lessonForm.videoUrls,
+          resource_links: lessonForm.resourceLinks,
           duration: lessonForm.duration,
           week_id: selectedWeekId,
           order_index: lessonForm.order
-        })
+        }
+        console.log('Create data being sent:', JSON.stringify(createData, null, 2))
+        
+        const result = await createLesson(createData)
         
         console.log('Lesson created successfully:', result)
         
@@ -382,20 +402,9 @@ export default function WeeksManagementPage() {
         })
       }
       
-      // Refresh weeks data
-      console.log('Refreshing weeks data...')
-      const weeksData = await getAllWeeks()
-      console.log('Refreshed weeks data after lesson creation:', weeksData)
-      console.log('Week with new lesson:', weeksData.find(w => w.id === selectedWeekId))
-      setWeeks(weeksData.map(week => ({
-        ...week,
-        lessons: week.lessons ? week.lessons.sort((a: any, b: any) => a.order_index - b.order_index) : []
-      })))
-      
-      setLessonForm({ title: "", type: "video", duration: "", content: "", videoUrl: "", order: 1 })
-      setEditingLesson(null)
-      setShowLessonForm(false)
-      setSelectedWeekId(null)
+      // Refresh the page to show updated data
+      console.log('Refreshing page...')
+      window.location.reload()
     } catch (error: any) {
       console.error('Error saving lesson:', error)
       console.error('Error details:', {
@@ -409,6 +418,8 @@ export default function WeeksManagementPage() {
         title: 'Save Failed',
         message: `Failed to save lesson: ${error?.message || 'Unknown error'}`
       })
+    } finally {
+      setSavingLesson(false)
     }
   }
 
@@ -436,6 +447,8 @@ export default function WeeksManagementPage() {
       duration: lesson.duration || "",
       content: lesson.content || "",
       videoUrl: lesson.video_url || "",
+      videoUrls: lesson.video_urls || [],
+      resourceLinks: lesson.resource_links || [],
       order: lesson.order_index
     })
     setShowLessonForm(true)
@@ -875,74 +888,116 @@ export default function WeeksManagementPage() {
 
       {/* Lesson Form Modal */}
       {showLessonForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-2xl">
-            <h2 className="text-xl font-bold mb-4">
-              {editingLesson ? "Edit Lesson" : "Add New Lesson"}
-            </h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-card border border-border rounded-lg w-full max-w-2xl my-8 max-h-[90vh] flex flex-col">
+            {/* Header - Fixed */}
+            <div className="p-6 border-b border-border flex-shrink-0">
+              <h2 className="text-xl font-bold">
+                {editingLesson ? "Edit Lesson" : "Add New Lesson"}
+              </h2>
+            </div>
             
-            <form onSubmit={handleLessonSubmit} className="space-y-4">
-              <div>
-                <label className="block font-medium mb-2">Title *</label>
-                <input
-                  type="text"
-                  value={lessonForm.title}
-                  onChange={(e) => setLessonForm(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Lesson title"
-                  className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+            {/* Form Content - Scrollable */}
+            <form onSubmit={handleLessonSubmit} className="flex flex-col flex-1 min-h-0">
+              <div className="p-6 space-y-4 overflow-y-auto flex-1">
                 <div>
-                  <label className="block font-medium mb-2">Type *</label>
-                  <select
-                    value={lessonForm.type}
-                    onChange={(e) => setLessonForm(prev => ({ ...prev, type: e.target.value }))}
-                    className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="video">Video Lesson</option>
-                    <option value="text">Text Lesson</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-medium mb-2">Order *</label>
+                  <label className="block font-medium mb-2">Title *</label>
                   <input
-                    type="number"
-                    value={lessonForm.order}
-                    onChange={(e) => setLessonForm(prev => ({ ...prev, order: parseInt(e.target.value) }))}
-                    min="1"
+                    type="text"
+                    value={lessonForm.title}
+                    onChange={(e) => setLessonForm(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Lesson title"
                     className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     required
                   />
                 </div>
-              </div>
 
-              {lessonForm.type === "video" && (
-                <>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block font-medium mb-2">Video URL</label>
-                    <input
-                      type="url"
-                      value={lessonForm.videoUrl}
-                      onChange={(e) => setLessonForm(prev => ({ ...prev, videoUrl: e.target.value }))}
-                      placeholder="https://www.youtube.com/watch?v=..."
+                    <label className="block font-medium mb-2">Type *</label>
+                    <select
+                      value={lessonForm.type}
+                      onChange={(e) => setLessonForm(prev => ({ ...prev, type: e.target.value }))}
                       className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
+                    >
+                      <option value="video">Video Lesson</option>
+                      <option value="text">Text Lesson</option>
+                    </select>
                   </div>
 
                   <div>
-                    <label className="block font-medium mb-2">Duration</label>
+                    <label className="block font-medium mb-2">Order *</label>
                     <input
-                      type="text"
-                      value={lessonForm.duration}
-                      onChange={(e) => setLessonForm(prev => ({ ...prev, duration: e.target.value }))}
-                      placeholder="e.g., 15 min"
+                      type="number"
+                      value={lessonForm.order}
+                      onChange={(e) => setLessonForm(prev => ({ ...prev, order: parseInt(e.target.value) }))}
+                      min="1"
                       className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      required
                     />
                   </div>
+                </div>
+
+                {lessonForm.type === "video" && (
+                  <>
+                    <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                      <p className="text-sm font-semibold text-yellow-400 mb-2">⚠️ Video Configuration</p>
+                      <div className="text-xs text-foreground/70 space-y-1">
+                        <p>• <strong>Legacy Single Video:</strong> {lessonForm.videoUrl ? '✅ Set' : '❌ Empty'}</p>
+                        <p>• <strong>Multiple Videos:</strong> {lessonForm.videoUrls.length} video(s) added</p>
+                        <p className="mt-2 text-yellow-300">Students will see BOTH the legacy video AND all multiple videos combined.</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-medium mb-2">Single Video URL (Legacy)</label>
+                      <input
+                        type="url"
+                        value={lessonForm.videoUrl}
+                        onChange={(e) => setLessonForm(prev => ({ ...prev, videoUrl: e.target.value }))}
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <p className="text-xs text-foreground/50 mt-1">Or use multiple videos below</p>
+                    </div>
+
+                    <div>
+                      <label className="block font-medium mb-2">Duration</label>
+                      <input
+                        type="text"
+                        value={lessonForm.duration}
+                        onChange={(e) => setLessonForm(prev => ({ ...prev, duration: e.target.value }))}
+                        placeholder="e.g., 15 min"
+                        className="w-full p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+
+                  {/* Multiple Videos */}
+                  <div>
+                    <div className="mb-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                      <p className="text-sm font-semibold text-blue-400 mb-1">📹 Multiple Videos Section</p>
+                      <p className="text-xs text-foreground/70">
+                        Currently {lessonForm.videoUrls.length} video(s) added. Use the form below to add more videos.
+                      </p>
+                    </div>
+                    <MultiVideoInput
+                      videos={lessonForm.videoUrls}
+                      onChange={(videos) => {
+                        console.log('MultiVideoInput onChange called with:', videos)
+                        setLessonForm(prev => ({ ...prev, videoUrls: videos }))
+                      }}
+                      maxVideos={5}
+                      label="Multiple Videos"
+                    />
+                  </div>
+
+                  {/* Resource Links */}
+                  <MultiLinkInput
+                    links={lessonForm.resourceLinks}
+                    onChange={(links) => setLessonForm(prev => ({ ...prev, resourceLinks: links }))}
+                    maxLinks={5}
+                    label="Resource Links"
+                  />
                 </>
               )}
 
@@ -958,25 +1013,39 @@ export default function WeeksManagementPage() {
                   />
                 </div>
               )}
+              </div>
 
-              <div className="flex gap-3 pt-4">
+              {/* Footer - Fixed at bottom */}
+              <div className="p-6 border-t border-border flex gap-3 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     setShowLessonForm(false)
                     setEditingLesson(null)
                     setSelectedWeekId(null)
-                    setLessonForm({ title: "", type: "video", duration: "", content: "", videoUrl: "", order: 1 })
+                    setLessonForm({ title: "", type: "video", duration: "", content: "", videoUrl: "", videoUrls: [], resourceLinks: [], order: 1 })
                   }}
-                  className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
+                  disabled={savingLesson}
+                  className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                  disabled={savingLesson}
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {editingLesson ? "Update Lesson" : "Add Lesson"}
+                  {savingLesson ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving...
+                    </>
+                  ) : (
+                    editingLesson ? "Update Lesson" : "Add Lesson"
+                  )}
                 </button>
               </div>
             </form>

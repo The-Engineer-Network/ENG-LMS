@@ -14,31 +14,51 @@ export default function AdminDashboard() {
   const [exportLoading, setExportLoading] = useState(false)
 
   useEffect(() => {
+    let mounted = true
+    let retryCount = 0
+    const maxRetries = 2
+    
     async function loadDashboardData() {
       if (!user?.id || user.role !== 'admin') return
       
       try {
+        console.log('Loading admin dashboard data...')
+        const startTime = Date.now()
+        
         const [data, analyticsData] = await Promise.all([
           getAdminDashboardData(),
           getAdminAnalytics()
         ])
         
-        // Transform to match expected structure
-        const transformedData = {
-          totalStudents: data.totalStudents,
-          studentsByTrack: data.studentsByTrack,
-          pendingSubmissions: data.pendingSubmissions,
-          approvedCertificates: data.approvedCertificates,
-          completionRate: data.completionRate,
-          trackMetrics: data.trackMetrics || [], // Use real track metrics from database
-        }
+        const loadTime = Date.now() - startTime
+        console.log(`Admin dashboard data loaded in ${loadTime}ms`)
         
-        setDashboardData(transformedData)
-        setAnalytics(analyticsData)
+        if (mounted) {
+          // Transform to match expected structure
+          const transformedData = {
+            totalStudents: data.totalStudents,
+            studentsByTrack: data.studentsByTrack,
+            pendingSubmissions: data.pendingSubmissions,
+            approvedCertificates: data.approvedCertificates,
+            completionRate: data.completionRate,
+            trackMetrics: data.trackMetrics || [],
+          }
+          
+          setDashboardData(transformedData)
+          setAnalytics(analyticsData)
+          setLoading(false)
+        }
       } catch (error) {
         console.error('Error loading dashboard data:', error)
-      } finally {
-        setLoading(false)
+        
+        // Retry logic for network errors
+        if (retryCount < maxRetries && mounted) {
+          retryCount++
+          console.log(`Retrying... (${retryCount}/${maxRetries})`)
+          setTimeout(() => loadDashboardData(), 1000 * retryCount)
+        } else if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
@@ -72,14 +92,67 @@ export default function AdminDashboard() {
   if (authLoading || loading) {
     return (
       <div className="p-4 md:p-8 max-w-7xl">
-        <div className="animate-pulse">
-          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
-          <div className="h-4 bg-muted rounded w-1/2 mb-8"></div>
-          <div className="grid md:grid-cols-4 gap-4 mb-8">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-muted rounded-xl"></div>
+        {/* Header Skeleton */}
+        <div className="mb-8 animate-pulse">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
+            <div>
+              <div className="h-8 bg-muted rounded w-64 mb-2"></div>
+              <div className="h-4 bg-muted rounded w-48"></div>
+            </div>
+            <div className="flex gap-2 mt-4 md:mt-0">
+              <div className="h-10 bg-muted rounded w-32"></div>
+              <div className="h-10 bg-muted rounded w-32"></div>
+              <div className="h-10 bg-muted rounded w-32"></div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Stats Grid Skeleton */}
+        <div className="grid md:grid-cols-5 gap-4 mb-8">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="p-6 rounded-xl bg-card border border-border animate-pulse">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="h-3 bg-muted rounded w-20 mb-3"></div>
+                  <div className="h-8 bg-muted rounded w-16"></div>
+                </div>
+                <div className="w-12 h-12 bg-muted rounded-lg"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Track Metrics Skeleton */}
+        <div className="mb-8 p-6 rounded-xl bg-card border border-border animate-pulse">
+          <div className="h-6 bg-muted rounded w-48 mb-4"></div>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="p-4 rounded-lg bg-background border border-border/50">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="h-4 bg-muted rounded w-32"></div>
+                  <div className="h-3 bg-muted rounded w-16"></div>
+                </div>
+                <div className="w-full h-2 bg-muted rounded-full"></div>
+              </div>
             ))}
           </div>
+        </div>
+        
+        {/* Two Column Grid Skeleton */}
+        <div className="grid md:grid-cols-2 gap-8">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="p-6 rounded-xl bg-card border border-border animate-pulse">
+              <div className="h-6 bg-muted rounded w-40 mb-4"></div>
+              <div className="space-y-3">
+                {[...Array(3)].map((_, j) => (
+                  <div key={j} className="flex items-center justify-between p-3 rounded-lg bg-background border border-border/50">
+                    <div className="h-4 bg-muted rounded w-24"></div>
+                    <div className="h-6 bg-muted rounded-full w-12"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     )

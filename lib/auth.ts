@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase } from './supabase-fixed'
 
 export interface AuthUser {
   id: string
@@ -8,41 +8,87 @@ export interface AuthUser {
 }
 
 export async function signUp(email: string, password: string, fullName: string, trackId: string, cohortId: string) {
-  // Check if user is in whitelist
-  const { data: whitelistEntry } = await supabase
-    .from('paid_learner_whitelist')
-    .select('*')
-    .eq('email', email)
-    .eq('track_id', trackId)
-    .eq('cohort_id', cohortId)
-    .eq('status', 'active')
-    .single()
+  try {
+    // Check if user is in whitelist
+    const { data: whitelistEntry, error: whitelistError } = await supabase
+      .from('paid_learner_whitelist')
+      .select('*')
+      .eq('email', email)
+      .eq('track_id', trackId)
+      .eq('cohort_id', cohortId)
+      .eq('status', 'active')
+      .single()
 
-  if (!whitelistEntry) {
-    throw new Error('Email not found in whitelist or not approved for this track/cohort')
-  }
-
-  // Create auth user
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName
-      }
+    if (whitelistError || !whitelistEntry) {
+      throw new Error('Email not found in whitelist or not approved for this track/cohort')
     }
-  })
 
-  if (authError) throw authError
+    // Create auth user
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          role: 'student'
+        }
+      }
+    })
 
-  if (authData.user) {
-    console.log('User created successfully:', authData.user.id)
+    if (authError) {
+      console.error('Auth signup error:', authError)
+      throw new Error(authError.message || 'Failed to create account')
+    }
+
+    if (!authData.user) {
+      throw new Error('No user data returned from signup')
+    }
+
+    console.log('Auth user created successfully:', authData.user.id)
     
-    // Wait for profile creation and automatic enrollment trigger to complete
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // CRITICAL: Create profile explicitly - this will trigger automatic enrollment
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authData.user.id,
+          email: email,
+          full_name: fullName,
+          role: 'student'
+        })
+        .select()
+        .single()
+
+      if (profileError) {
+        console.error('Profile creation error:', profileError)
+        // Profile might already exist, try to fetch it
+        console.log('Attempting to fetch existing profile...')
+        
+        const { data: existingProfile, error: fetchError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authData.user.id)
+          .single()
+        
+        if (fetchError || !existingProfile) {
+          console.error('Could not create or find profile:', fetchError)
+          // Continue anyway - we'll create enrollment manually
+        } else {
+          console.log('Found existing profile:', existingProfile)
+        }
+      } else {
+        console.log('Profile created successfully:', profileData)
+      }
+    } catch (profileErr: any) {
+      console.error('Profile handling error:', profileErr)
+      // Continue anyway - enrollment might still work
+    }
+    
+    // Wait a moment for the trigger to fire
+    await new Promise(resolve => setTimeout(resolve, 1500))
     
     // Check if enrollment was created automatically by the trigger
-    let enrollmentCheck = await supabase
+    const { data: enrollmentCheck, error: enrollmentCheckError } = await supabase
       .from('student_enrollments')
       .select('*')
       .eq('user_id', authData.user.id)
@@ -50,7 +96,7 @@ export async function signUp(email: string, password: string, fullName: string, 
       .eq('cohort_id', cohortId)
       .single()
 
-    if (enrollmentCheck.error || !enrollmentCheck.data) {
+    if (enrollmentCheckError || !enrollmentCheck) {
       console.log('Automatic enrollment not found, creating manually...')
       
       // Fallback: Create enrollment manually if trigger didn't work
@@ -71,7 +117,7 @@ export async function signUp(email: string, password: string, fullName: string, 
 
       if (enrollmentError) {
         console.error('Failed to create manual enrollment:', enrollmentError)
-        throw new Error(`Failed to create enrollment: ${enrollmentError.message}. Your account was created but enrollment failed. Please contact support.`)
+        throw new Error(`Account created but enrollment failed. Please contact support with your email: ${email}`)
       }
 
       console.log('Manual enrollment created successfully:', enrollmentData)
@@ -88,9 +134,7 @@ export async function signUp(email: string, password: string, fullName: string, 
           const weekProgressData = weeks.map((week, index) => ({
             student_id: authData.user.id,
             week_id: week.id,
-            status: index === 0 ? 'pending' : 'locked',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            status: index === 0 ? 'pending' : 'locked'
           }))
 
           const { error: progressError } = await supabase
@@ -107,11 +151,14 @@ export async function signUp(email: string, password: string, fullName: string, 
         console.warn('Error initializing week progress:', progressInitError)
       }
     } else {
-      console.log('Automatic enrollment found:', enrollmentCheck.data)
+      console.log('Automatic enrollment found:', enrollmentCheck)
     }
-  }
 
-  return authData
+    return authData
+  } catch (error: any) {
+    console.error('SignUp error:', error)
+    throw error
+  }
 }
 
 export async function signIn(email: string, password: string) {

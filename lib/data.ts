@@ -1,4 +1,5 @@
-import { supabase } from './supabase'
+import { supabase } from './supabase-fixed'
+import { dataCache, CACHE_KEYS, CACHE_TTL } from './cache'
 import type { 
   Track, 
   Cohort, 
@@ -19,21 +20,34 @@ import type {
 export async function getTracks(): Promise<Track[]> {
   console.log('getTracks: Starting function call')
   
+  // Check cache first
+  const cached = dataCache.get<Track[]>(CACHE_KEYS.TRACKS)
+  if (cached) {
+    console.log('getTracks: Returning cached data')
+    return cached
+  }
+  
   try {
-    const { data, error } = await supabase
-      .from('tracks')
-      .select('*')
-      .order('name')
-
-    console.log('getTracks: Supabase response:', { data, error, dataLength: data?.length })
-
-    if (error) {
-      console.error('getTracks: Database error:', error)
-      throw error
-    }
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     
-    console.log('getTracks: Returning data:', data)
-    return data || []
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+
+    const response = await fetch(`${url}/rest/v1/tracks?select=*&order=name`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+    })
+
+    const data = await response.json()
+    console.log('getTracks: HTTP response:', { dataLength: data?.length })
+
+    const tracks = data || []
+    // Cache for 5 minutes
+    dataCache.set(CACHE_KEYS.TRACKS, tracks, CACHE_TTL.LONG)
+    
+    console.log('getTracks: Returning data:', tracks)
+    return tracks
   } catch (err) {
     console.error('getTracks: Caught exception:', err)
     throw err
@@ -44,21 +58,34 @@ export async function getTracks(): Promise<Track[]> {
 export async function getCohorts(): Promise<Cohort[]> {
   console.log('getCohorts: Starting function call')
   
+  // Check cache first
+  const cached = dataCache.get<Cohort[]>(CACHE_KEYS.COHORTS)
+  if (cached) {
+    console.log('getCohorts: Returning cached data')
+    return cached
+  }
+  
   try {
-    const { data, error } = await supabase
-      .from('cohorts')
-      .select('*')
-      .order('start_date')
-
-    console.log('getCohorts: Supabase response:', { data, error, dataLength: data?.length })
-
-    if (error) {
-      console.error('getCohorts: Database error:', error)
-      throw error
-    }
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     
-    console.log('getCohorts: Returning data:', data)
-    return data || []
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+
+    const response = await fetch(`${url}/rest/v1/cohorts?select=*&order=start_date`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+    })
+
+    const data = await response.json()
+    console.log('getCohorts: HTTP response:', { dataLength: data?.length })
+
+    const cohorts = data || []
+    // Cache for 5 minutes
+    dataCache.set(CACHE_KEYS.COHORTS, cohorts, CACHE_TTL.LONG)
+    
+    console.log('getCohorts: Returning data:', cohorts)
+    return cohorts
   } catch (err) {
     console.error('getCohorts: Caught exception:', err)
     throw err
@@ -67,21 +94,106 @@ export async function getCohorts(): Promise<Cohort[]> {
 
 // Weeks and Lessons
 export async function getWeeksByTrack(trackId: string): Promise<Week[]> {
-  const { data, error } = await supabase
-    .from('weeks')
-    .select(`
-      *,
-      lessons(*),
-      assignments(*)
-    `)
-    .eq('track_id', trackId)
-    .order('order_index')
+  console.log('getWeeksByTrack called for trackId:', trackId)
+  
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
 
-  if (error) throw error
-  return data || []
+    // Fetch weeks first
+    const weeksRes = await fetch(`${url}/rest/v1/weeks?track_id=eq.${trackId}&select=*&order=order_index`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+    })
+    
+    const weeks = await weeksRes.json()
+    
+    if (!weeks || weeks.length === 0) {
+      console.log('No weeks found for track:', trackId)
+      return []
+    }
+
+    // Get all week IDs
+    const weekIds = weeks.map((w: any) => w.id).join(',')
+
+    // Fetch lessons and assignments for these weeks in parallel
+    const [lessonsRes, assignmentsRes] = await Promise.all([
+      fetch(`${url}/rest/v1/lessons?week_id=in.(${weekIds})&select=*&order=order_index`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      fetch(`${url}/rest/v1/assignments?week_id=in.(${weekIds})&select=*`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      })
+    ])
+
+    // Parse responses with proper error handling
+    let allLessons: any[] = []
+    let allAssignments: any[] = []
+    
+    try {
+      const lessonsData = await lessonsRes.json()
+      allLessons = Array.isArray(lessonsData) ? lessonsData : []
+    } catch (e) {
+      console.error('Error parsing lessons:', e)
+      allLessons = []
+    }
+    
+    try {
+      const assignmentsData = await assignmentsRes.json()
+      allAssignments = Array.isArray(assignmentsData) ? assignmentsData : []
+    } catch (e) {
+      console.error('Error parsing assignments:', e)
+      allAssignments = []
+    }
+
+    // Group lessons and assignments by week_id
+    const lessonsByWeek = new Map()
+    const assignmentsByWeek = new Map()
+    
+    allLessons.forEach((lesson: any) => {
+      if (!lessonsByWeek.has(lesson.week_id)) {
+        lessonsByWeek.set(lesson.week_id, [])
+      }
+      lessonsByWeek.get(lesson.week_id).push(lesson)
+    })
+    
+    allAssignments.forEach((assignment: any) => {
+      if (!assignmentsByWeek.has(assignment.week_id)) {
+        assignmentsByWeek.set(assignment.week_id, [])
+      }
+      assignmentsByWeek.get(assignment.week_id).push(assignment)
+    })
+
+    // Attach lessons and assignments to weeks
+    const weeksWithData = weeks.map((week: any) => ({
+      ...week,
+      lessons: lessonsByWeek.get(week.id) || [],
+      assignments: assignmentsByWeek.get(week.id) || []
+    }))
+
+    console.log('getWeeksByTrack result:', { 
+      weeksCount: weeksWithData.length, 
+      lessonsCount: allLessons.length,
+      assignmentsCount: allAssignments.length
+    })
+
+    return weeksWithData
+  } catch (err) {
+    console.error('getWeeksByTrack exception:', err)
+    throw err
+  }
 }
 
 export async function getAllWeeks(): Promise<Week[]> {
+  // Check cache first
+  const cached = dataCache.get<Week[]>(CACHE_KEYS.ALL_WEEKS)
+  if (cached) {
+    return cached
+  }
+
   const { data, error } = await supabase
     .from('weeks')
     .select(`
@@ -94,7 +206,12 @@ export async function getAllWeeks(): Promise<Week[]> {
     .order('order_index', { ascending: true })
 
   if (error) throw error
-  return data || []
+  
+  const weeks = data || []
+  // Cache for 2 minutes
+  dataCache.set(CACHE_KEYS.ALL_WEEKS, weeks, CACHE_TTL.MEDIUM)
+  
+  return weeks
 }
 
 // Assignments/Tasks
@@ -128,54 +245,353 @@ export async function getAllAssignments() {
   return data || []
 }
 
+// Get assignments for a specific student based on their enrollment
+export async function getStudentAssignments(studentId: string) {
+  console.log('getStudentAssignments called for studentId:', studentId)
+  
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+    
+    // First, get the student's enrollment to find their track
+    const enrollmentResponse = await fetch(
+      `${url}/rest/v1/student_enrollments?user_id=eq.${studentId}&select=track_id,cohort_id`,
+      {
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      }
+    )
+    
+    if (!enrollmentResponse.ok) {
+      console.error('Failed to fetch enrollment')
+      return []
+    }
+    
+    const enrollments = await enrollmentResponse.json()
+    if (!enrollments || enrollments.length === 0) {
+      console.log('No enrollment found for student')
+      return []
+    }
+    
+    const trackId = enrollments[0].track_id
+    console.log('Student track_id:', trackId)
+    
+    // Get all weeks for this track
+    const weeksResponse = await fetch(
+      `${url}/rest/v1/weeks?track_id=eq.${trackId}&select=id`,
+      {
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      }
+    )
+    
+    if (!weeksResponse.ok) {
+      console.error('Failed to fetch weeks')
+      return []
+    }
+    
+    const weeks = await weeksResponse.json()
+    const weekIds = weeks.map((w: any) => w.id)
+    console.log('Week IDs for track:', weekIds)
+    
+    if (weekIds.length === 0) {
+      console.log('No weeks found for track')
+      return []
+    }
+    
+    // Get all assignments for these weeks
+    const assignmentsResponse = await fetch(
+      `${url}/rest/v1/assignments?week_id=in.(${weekIds.join(',')})&select=*,week:weeks(id,week_number,title,track:tracks(id,name))&order=created_at.desc`,
+      {
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      }
+    )
+    
+    if (!assignmentsResponse.ok) {
+      console.error('Failed to fetch assignments')
+      return []
+    }
+    
+    const assignments = await assignmentsResponse.json()
+    console.log('Found assignments:', assignments.length)
+    
+    // Get student's submissions to mark which assignments are submitted
+    const submissionsResponse = await fetch(
+      `${url}/rest/v1/task_submissions?student_id=eq.${studentId}&select=assignment_id,status,submitted_at`,
+      {
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      }
+    )
+    
+    const submissions = submissionsResponse.ok ? await submissionsResponse.json() : []
+    const submissionMap = new Map(submissions.map((s: any) => [s.assignment_id, s]))
+    
+    // Combine assignments with submission status
+    const assignmentsWithStatus = assignments.map((assignment: any) => {
+      const submission = submissionMap.get(assignment.id)
+      return {
+        ...assignment,
+        submission_status: submission?.status || null,
+        submitted_at: submission?.submitted_at || null,
+        has_submission: !!submission
+      }
+    })
+    
+    console.log('Assignments with status:', assignmentsWithStatus.length)
+    return assignmentsWithStatus
+  } catch (err: any) {
+    console.error('Error in getStudentAssignments:', err)
+    return []
+  }
+}
+
 // Student Enrollments
 export async function getStudentEnrollments(): Promise<StudentEnrollment[]> {
-  const { data, error } = await supabase
-    .from('student_enrollments')
-    .select(`
-      *,
-      user:profiles(*),
-      track:tracks(*),
-      cohort:cohorts(*)
-    `)
-    .order('enrolled_at', { ascending: false })
+  console.log('getStudentEnrollments called')
+  
+  // Check cache first
+  const cached = dataCache.get<StudentEnrollment[]>(CACHE_KEYS.STUDENTS)
+  if (cached) {
+    console.log('Returning cached student enrollments')
+    return cached
+  }
 
-  if (error) throw error
-  return data || []
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+
+    // Fetch enrollments, profiles, tracks, and cohorts in parallel
+    const [enrollmentsRes, profilesRes, tracksRes, cohortsRes] = await Promise.all([
+      fetch(`${url}/rest/v1/student_enrollments?select=*&order=enrolled_at.desc`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      fetch(`${url}/rest/v1/profiles?select=*`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      fetch(`${url}/rest/v1/tracks?select=*`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      fetch(`${url}/rest/v1/cohorts?select=*`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      })
+    ])
+
+    const enrollments = await enrollmentsRes.json()
+    const profiles = await profilesRes.json()
+    const tracks = await tracksRes.json()
+    const cohorts = await cohortsRes.json()
+
+    // Create lookup maps for fast access
+    const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || [])
+    const trackMap = new Map(tracks?.map((t: any) => [t.id, t]) || [])
+    const cohortMap = new Map(cohorts?.map((c: any) => [c.id, c]) || [])
+
+    // Combine data
+    const enrichedEnrollments = enrollments?.map((enrollment: any) => ({
+      ...enrollment,
+      user: profileMap.get(enrollment.user_id),
+      track: trackMap.get(enrollment.track_id),
+      cohort: cohortMap.get(enrollment.cohort_id)
+    })) || []
+    
+    // Cache for 2 minutes
+    dataCache.set(CACHE_KEYS.STUDENTS, enrichedEnrollments, CACHE_TTL.MEDIUM)
+    
+    console.log(`Loaded ${enrichedEnrollments.length} student enrollments`)
+    return enrichedEnrollments
+  } catch (error) {
+    console.error('Error in getStudentEnrollments:', error)
+    throw error
+  }
 }
 
 export async function getStudentEnrollment(userId: string): Promise<StudentEnrollment | null> {
-  const { data, error } = await supabase
-    .from('student_enrollments')
-    .select(`
-      *,
-      user:profiles(*),
-      track:tracks(*),
-      cohort:cohorts(*)
-    `)
-    .eq('user_id', userId)
-    .single()
+  console.log('getStudentEnrollment called for userId:', userId)
+  
+  try {
+    // First get the enrollment
+    const { data: enrollment, error: enrollmentError } = await supabase
+      .from('student_enrollments')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
 
-  if (error) return null
-  return data
+    if (enrollmentError || !enrollment) {
+      console.error('getStudentEnrollment error:', enrollmentError)
+      return null
+    }
+
+    // Then get related data separately
+    const [profileResult, trackResult, cohortResult] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', userId).single(),
+      supabase.from('tracks').select('*').eq('id', enrollment.track_id).single(),
+      supabase.from('cohorts').select('*').eq('id', enrollment.cohort_id).single()
+    ])
+
+    const result = {
+      ...enrollment,
+      user: profileResult.data,
+      track: trackResult.data,
+      cohort: cohortResult.data
+    }
+
+    console.log('getStudentEnrollment result:', result)
+    return result
+  } catch (err) {
+    console.error('getStudentEnrollment exception:', err)
+    return null
+  }
 }
 
 // Task Submissions
 export async function getTaskSubmissions(): Promise<TaskSubmission[]> {
-  const { data, error } = await supabase
-    .from('task_submissions')
-    .select(`
-      *,
-      student:profiles(*),
-      assignment:assignments(
-        *,
-        week:weeks(*)
-      )
-    `)
-    .order('submitted_at', { ascending: false })
+  console.log('getTaskSubmissions called')
+  
+  // Check cache first
+  const cached = dataCache.get<TaskSubmission[]>(CACHE_KEYS.SUBMISSIONS)
+  if (cached) {
+    console.log('Returning cached submissions')
+    return cached
+  }
 
-  if (error) throw error
-  return data || []
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+    
+    // Fetch submissions with basic relations
+    const response = await fetch(
+      `${url}/rest/v1/task_submissions?select=*&order=submitted_at.desc`,
+      {
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      }
+    )
+    
+    if (!response.ok) {
+      console.error('Failed to fetch submissions:', response.status)
+      return []
+    }
+    
+    const submissions = await response.json()
+    console.log('Fetched submissions:', submissions.length)
+    
+    if (submissions.length === 0) {
+      return []
+    }
+    
+    // Fetch related data separately
+    const studentIds = [...new Set(submissions.map((s: any) => s.student_id))]
+    const assignmentIds = [...new Set(submissions.map((s: any) => s.assignment_id))]
+    
+    // Fetch students
+    const studentsResponse = await fetch(
+      `${url}/rest/v1/profiles?id=in.(${studentIds.join(',')})&select=id,full_name,email`,
+      {
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      }
+    )
+    const students = studentsResponse.ok ? await studentsResponse.json() : []
+    const studentMap = new Map(students.map((s: any) => [s.id, s]))
+    
+    // Fetch assignments with weeks
+    const assignmentsResponse = await fetch(
+      `${url}/rest/v1/assignments?id=in.(${assignmentIds.join(',')})&select=id,title,week_id`,
+      {
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      }
+    )
+    const assignments = assignmentsResponse.ok ? await assignmentsResponse.json() : []
+    const assignmentMap = new Map(assignments.map((a: any) => [a.id, a]))
+    
+    // Fetch weeks
+    const weekIds = [...new Set(assignments.map((a: any) => a.week_id).filter(Boolean))]
+    if (weekIds.length > 0) {
+      const weeksResponse = await fetch(
+        `${url}/rest/v1/weeks?id=in.(${weekIds.join(',')})&select=id,week_number,title,track_id`,
+        {
+          headers: {
+            'apikey': key,
+            'Authorization': `Bearer ${key}`
+          }
+        }
+      )
+      const weeks = weeksResponse.ok ? await weeksResponse.json() : []
+      const weekMap = new Map(weeks.map((w: any) => [w.id, w]))
+      
+      // Fetch tracks
+      const trackIds = [...new Set(weeks.map((w: any) => w.track_id).filter(Boolean))]
+      if (trackIds.length > 0) {
+        const tracksResponse = await fetch(
+          `${url}/rest/v1/tracks?id=in.(${trackIds.join(',')})&select=id,name`,
+          {
+            headers: {
+              'apikey': key,
+              'Authorization': `Bearer ${key}`
+            }
+          }
+        )
+        const tracks = tracksResponse.ok ? await tracksResponse.json() : []
+        const trackMap = new Map(tracks.map((t: any) => [t.id, t]))
+        
+        // Attach tracks to weeks
+        weeks.forEach((week: any) => {
+          week.track = trackMap.get(week.track_id)
+        })
+      }
+      
+      // Attach weeks to assignments
+      assignments.forEach((assignment: any) => {
+        assignment.week = weekMap.get(assignment.week_id)
+      })
+    }
+    
+    // Combine all data
+    const enrichedSubmissions = submissions.map((sub: any) => ({
+      ...sub,
+      student: studentMap.get(sub.student_id),
+      assignment: assignmentMap.get(sub.assignment_id)
+    }))
+    
+    console.log('Enriched submissions:', enrichedSubmissions.length)
+    
+    // Cache for 30 seconds (frequently changing)
+    dataCache.set(CACHE_KEYS.SUBMISSIONS, enrichedSubmissions, CACHE_TTL.SHORT)
+    
+    return enrichedSubmissions
+  } catch (err: any) {
+    console.error('Error in getTaskSubmissions:', err)
+    return []
+  }
 }
 
 export async function getStudentSubmissions(studentId: string): Promise<TaskSubmission[]> {
@@ -334,6 +750,12 @@ export async function getAllClarityRequests(): Promise<ClarityCallRequest[]> {
 
 // Paid Learner Whitelist
 export async function getPaidLearnerWhitelist(): Promise<PaidLearnerWhitelist[]> {
+  // Check cache first
+  const cached = dataCache.get<PaidLearnerWhitelist[]>(CACHE_KEYS.WHITELIST)
+  if (cached) {
+    return cached
+  }
+
   const { data, error } = await supabase
     .from('paid_learner_whitelist')
     .select(`
@@ -344,7 +766,12 @@ export async function getPaidLearnerWhitelist(): Promise<PaidLearnerWhitelist[]>
     .order('added_date', { ascending: false })
 
   if (error) throw error
-  return data || []
+  
+  const whitelist = data || []
+  // Cache for 2 minutes
+  dataCache.set(CACHE_KEYS.WHITELIST, whitelist, CACHE_TTL.MEDIUM)
+  
+  return whitelist
 }
 
 export async function checkWhitelistStatus(email: string, trackId: string, cohortId: string): Promise<boolean> {
@@ -362,134 +789,201 @@ export async function checkWhitelistStatus(email: string, trackId: string, cohor
 
 // Dashboard Data
 export async function getAdminDashboardData() {
-  // Get total students
-  const { count: totalStudents } = await supabase
-    .from('student_enrollments')
-    .select('*', { count: 'exact', head: true })
-
-  // Get students by track - using a different approach
-  const { data: enrollments } = await supabase
-    .from('student_enrollments')
-    .select(`
-      track:tracks(name)
-    `)
-
-  const studentsByTrack = enrollments?.reduce((acc: any[], enrollment: any) => {
-    const trackName = enrollment.track?.name
-    if (trackName) {
-      const existing = acc.find(item => item.track === trackName)
-      if (existing) {
-        existing.count++
-      } else {
-        acc.push({ track: trackName, count: 1 })
-      }
+  console.log('getAdminDashboardData called')
+  
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
     }
-    return acc
-  }, []) || []
 
-  // Get pending submissions
-  const { count: pendingSubmissions } = await supabase
-    .from('task_submissions')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'pending')
+    // OPTIMIZATION: Fetch all data in parallel
+    const [enrollmentsRes, tracksRes, pendingRes, certificatesRes, submissionsRes, trackMetricsRes] = await Promise.all([
+      // Get enrollments
+      fetch(`${url}/rest/v1/student_enrollments?select=*`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      // Get all tracks
+      fetch(`${url}/rest/v1/tracks?select=id,name`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      // Get pending submissions count
+      fetch(`${url}/rest/v1/task_submissions?status=eq.pending&select=id`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      // Get approved certificates count
+      fetch(`${url}/rest/v1/certificates?is_approved=eq.true&select=id`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      // Get all submissions for completion rate
+      fetch(`${url}/rest/v1/task_submissions?select=status`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      // Get track metrics from view
+      fetch(`${url}/rest/v1/admin_dashboard_view?select=*`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      })
+    ])
 
-  // Get approved certificates
-  const { count: approvedCertificates } = await supabase
-    .from('certificates')
-    .select('*', { count: 'exact', head: true })
-    .eq('is_approved', true)
+    const enrollments = await enrollmentsRes.json()
+    const tracks = await tracksRes.json()
+    const pendingSubmissions = await pendingRes.json()
+    const approvedCertificates = await certificatesRes.json()
+    const submissionStats = await submissionsRes.json()
+    const trackMetrics = await trackMetricsRes.json()
 
-  // Calculate overall completion rate
-  const { data: submissionStats } = await supabase
-    .from('task_submissions')
-    .select('status')
+    // Create track map for quick lookup
+    const trackMap = new Map(tracks?.map((t: any) => [t.id, t.name]) || [])
 
-  const totalSubmissions = submissionStats?.length || 0
-  const approvedSubmissions = submissionStats?.filter(s => s.status === 'approved').length || 0
-  const completionRate = totalSubmissions > 0 ? Math.round((approvedSubmissions / totalSubmissions) * 100) : 0
+    // Calculate students by track
+    const studentsByTrack = enrollments?.reduce((acc: any[], enrollment: any) => {
+      const trackName = trackMap.get(enrollment.track_id)
+      if (trackName) {
+        const existing = acc.find(item => item.track === trackName)
+        if (existing) {
+          existing.count++
+        } else {
+          acc.push({ track: trackName, count: 1 })
+        }
+      }
+      return acc
+    }, []) || []
 
-  // Get track metrics
-  const { data: trackMetrics } = await supabase
-    .from('admin_dashboard_view')
-    .select('*')
+    // Calculate completion rate
+    const totalSubmissions = submissionStats?.length || 0
+    const approvedSubmissions = submissionStats?.filter((s: any) => s.status === 'approved').length || 0
+    const completionRate = totalSubmissions > 0 ? Math.round((approvedSubmissions / totalSubmissions) * 100) : 0
 
-  const formattedTrackMetrics = trackMetrics?.map(track => ({
-    track: track.track_name,
-    completion: track.approval_rate || 0,
-    tasks: `${track.approved_submissions || 0}/${track.total_assignments || 0}`
-  })) || []
+    // Format track metrics
+    const formattedTrackMetrics = trackMetrics?.map((track: any) => ({
+      track: track.track_name,
+      completion: track.approval_rate || 0,
+      tasks: `${track.approved_submissions || 0}/${track.total_assignments || 0}`
+    })) || []
 
-  return {
-    totalStudents: totalStudents || 0,
-    studentsByTrack: studentsByTrack || [],
-    pendingSubmissions: pendingSubmissions || 0,
-    approvedCertificates: approvedCertificates || 0,
-    completionRate: completionRate,
-    trackMetrics: formattedTrackMetrics
+    return {
+      totalStudents: enrollments?.length || 0,
+      studentsByTrack: studentsByTrack || [],
+      pendingSubmissions: pendingSubmissions?.length || 0,
+      approvedCertificates: approvedCertificates?.length || 0,
+      completionRate: completionRate,
+      trackMetrics: formattedTrackMetrics
+    }
+  } catch (error) {
+    console.error('Error in getAdminDashboardData:', error)
+    throw error
   }
 }
 
 export async function getStudentDashboardData(userId: string) {
   console.log('getStudentDashboardData called for userId:', userId)
   
-  const enrollment = await getStudentEnrollment(userId)
-  console.log('Student enrollment result:', enrollment)
-  
-  if (!enrollment) {
-    console.log('No enrollment found for user:', userId)
-    return null
-  }
-
-  const weekProgress = await getStudentWeekProgress(userId)
-  const weeks = await getWeeksByTrack(enrollment.track_id)
-
-  // Get task submissions with needs_changes status
-  const { count: needsCorrection } = await supabase
-    .from('task_submissions')
-    .select('*', { count: 'exact', head: true })
-    .eq('student_id', userId)
-    .eq('status', 'needs_changes')
-
-  // Map weeks with progress status
-  const weeksWithStatus = weeks.map((week, index) => {
-    const progress = weekProgress.find(p => p.week_id === week.id)
-    const isLocked = index > 0 && !weekProgress.find(p => p.week_id === weeks[index - 1].id && p.status === 'approved')
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     
-    let status = 'Locked'
-    if (!isLocked) {
-      if (progress?.status === 'approved') {
-        status = 'Approved'
-      } else if (progress?.status === 'pending') {
-        status = 'Pending Review'
-      } else {
-        status = 'Pending Submission'
-      }
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
     }
+
+    // Fetch enrollment first
+    const enrollmentRes = await fetch(
+      `${url}/rest/v1/student_enrollments?user_id=eq.${userId}&select=*`,
+      {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }
+    )
+    
+    const enrollments = await enrollmentRes.json()
+    const enrollment = Array.isArray(enrollments) && enrollments.length > 0 ? enrollments[0] : null
+    
+    if (!enrollment) {
+      console.log('No enrollment found for user:', userId)
+      return null
+    }
+
+    // Fetch all related data in parallel
+    const [userRes, trackRes, cohortRes, weekProgressRes, needsCorrectionRes, weeksRes] = await Promise.all([
+      fetch(`${url}/rest/v1/profiles?id=eq.${userId}&select=id,full_name,email`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      fetch(`${url}/rest/v1/tracks?id=eq.${enrollment.track_id}&select=id,name`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      fetch(`${url}/rest/v1/cohorts?id=eq.${enrollment.cohort_id}&select=id,name`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      fetch(`${url}/rest/v1/week_progress?student_id=eq.${userId}&select=week_id,status,submitted_at,approved_at`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      fetch(`${url}/rest/v1/task_submissions?student_id=eq.${userId}&status=eq.needs_changes&select=id`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      fetch(`${url}/rest/v1/weeks?track_id=eq.${enrollment.track_id}&select=id,week_number,title,order_index&order=order_index`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      })
+    ])
+
+    const user = (await userRes.json())[0]
+    const track = (await trackRes.json())[0]
+    const cohort = (await cohortRes.json())[0]
+    const weekProgress = await weekProgressRes.json()
+    const needsCorrection = (await needsCorrectionRes.json()).length
+    const weeks = await weeksRes.json()
+
+    // Map weeks with progress status (optimized)
+    const progressMap = new Map(weekProgress.map((p: any) => [p.week_id, p]))
+    const weeksWithStatus = weeks?.map((week: any, index: number) => {
+      const progress = progressMap.get(week.id)
+      const prevWeek = index > 0 ? weeks[index - 1] : null
+      const prevProgress = prevWeek ? progressMap.get(prevWeek.id) : null
+      const isLocked = index > 0 && prevProgress?.status !== 'approved'
+      
+      let status = 'Locked'
+      if (!isLocked) {
+        if (progress?.status === 'approved') {
+          status = 'Approved'
+        } else if (progress?.status === 'pending') {
+          status = 'Pending Review'
+        } else {
+          status = 'Pending Submission'
+        }
+      }
+
+      return {
+        id: week.id,
+        week: week.week_number,
+        title: week.title,
+        status,
+        submitted: !!progress?.submitted_at,
+        locked: isLocked
+      }
+    }) || []
+
+    const approvedCount = weekProgress.filter((p: any) => p.status === 'approved').length
+    const pendingCount = weekProgress.filter((p: any) => p.status === 'pending').length
 
     return {
-      week: week.week_number,
-      title: week.title,
-      status,
-      submitted: !!progress?.submitted_at,
-      locked: isLocked
+      student: {
+        name: user?.full_name || '',
+        track: track?.name || '',
+        cohort: cohort?.name || '',
+        progress: enrollment.progress_percentage || 0,
+        weekCount: weeks?.length || 0,
+        completedWeeks: approvedCount,
+        submissions: {
+          approved: approvedCount,
+          pending: pendingCount,
+          needsCorrection: needsCorrection
+        }
+      },
+      weeks: weeksWithStatus
     }
-  })
-
-  return {
-    student: {
-      name: enrollment.user?.full_name || '',
-      track: enrollment.track?.name || '',
-      cohort: enrollment.cohort?.name || '',
-      progress: enrollment.progress_percentage,
-      weekCount: weeks.length,
-      completedWeeks: weekProgress.filter(p => p.status === 'approved').length,
-      submissions: {
-        approved: weekProgress.filter(p => p.status === 'approved').length,
-        pending: weekProgress.filter(p => p.status === 'pending').length,
-        needsCorrection: needsCorrection || 0
-      }
-    },
-    weeks: weeksWithStatus
+  } catch (error) {
+    console.error('Error in getStudentDashboardData:', error)
+    throw error
   }
 }
 
@@ -706,6 +1200,11 @@ export async function createWeek(weekData: {
     .single()
 
   if (error) throw error
+  
+  // Invalidate weeks cache
+  dataCache.invalidate(CACHE_KEYS.ALL_WEEKS)
+  dataCache.invalidate(CACHE_KEYS.WEEKS_BY_TRACK(weekData.track_id))
+  
   return data
 }
 
@@ -735,6 +1234,8 @@ export async function createLesson(lessonData: {
   type: 'video' | 'text'
   content?: string
   video_url?: string
+  video_urls?: any[]
+  resource_links?: any[]
   duration?: string
   week_id: string
   order_index: number
@@ -742,30 +1243,46 @@ export async function createLesson(lessonData: {
   console.log('createLesson called with data:', lessonData)
   
   try {
-    console.log('Making direct Supabase insert...')
+    console.log('Attempting direct insert to lessons table...')
     
-    const { data, error } = await supabase
-      .from('lessons')
-      .insert(lessonData)
-      .select()
-      .single()
-
-    console.log('Direct insert response:', { data, error })
-
-    if (error) {
-      console.error('Supabase error details:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      })
-      throw error
+    // Try direct fetch to Supabase REST API as a workaround
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
     }
     
-    console.log('Lesson created successfully:', data)
-    return data
-  } catch (err) {
-    console.error('Error in createLesson function:', err)
+    console.log('Using direct HTTP request...')
+    
+    const response = await fetch(`${url}/rest/v1/lessons`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(lessonData)
+    })
+    
+    console.log('HTTP response status:', response.status)
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('HTTP request failed:', errorText)
+      throw new Error(`Failed to create lesson: ${response.status} ${errorText}`)
+    }
+    
+    const data = await response.json()
+    console.log('Lesson created successfully via HTTP:', data)
+    
+    // Invalidate weeks cache
+    dataCache.invalidate(CACHE_KEYS.ALL_WEEKS)
+    
+    return Array.isArray(data) ? data[0] : data
+  } catch (err: any) {
+    console.error('Error in createLesson:', err)
     throw err
   }
 }
@@ -785,18 +1302,53 @@ export async function updateLesson(lessonId: string, updates: {
   type?: 'video' | 'text'
   content?: string
   video_url?: string
+  video_urls?: any[]
+  resource_links?: any[]
   duration?: string
   order_index?: number
 }) {
-  const { data, error } = await supabase
-    .from('lessons')
-    .update(updates)
-    .eq('id', lessonId)
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
+  console.log('updateLesson called with:', { lessonId, updates })
+  
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+    
+    console.log('Using direct HTTP request for update...')
+    
+    const response = await fetch(`${url}/rest/v1/lessons?id=eq.${lessonId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(updates)
+    })
+    
+    console.log('HTTP response status:', response.status)
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('HTTP request failed:', errorText)
+      throw new Error(`Failed to update lesson: ${response.status} ${errorText}`)
+    }
+    
+    const data = await response.json()
+    console.log('Lesson updated successfully via HTTP:', data)
+    
+    // Invalidate weeks cache
+    dataCache.invalidate(CACHE_KEYS.ALL_WEEKS)
+    
+    return Array.isArray(data) ? data[0] : data
+  } catch (err: any) {
+    console.error('Error in updateLesson:', err)
+    throw err
+  }
 }
 
 export async function deleteLesson(lessonId: string) {
@@ -879,6 +1431,10 @@ export async function addWhitelistEntry(entryData: {
     .single()
 
   if (error) throw error
+  
+  // Invalidate whitelist cache
+  dataCache.invalidate(CACHE_KEYS.WHITELIST)
+  
   return data
 }
 
@@ -923,61 +1479,136 @@ export async function updateSubmissionReview(submissionId: string, reviewData: {
   grade?: string
   reviewed_by: string
 }) {
-  const { data, error } = await supabase
-    .from('task_submissions')
-    .update({
+  console.log('updateSubmissionReview called:', { submissionId, reviewData })
+  
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+    
+    const payload = {
       ...reviewData,
       reviewed_at: new Date().toISOString()
-    })
-    .eq('id', submissionId)
-    .select(`
-      *,
-      student:profiles(*),
-      assignment:assignments(
-        *,
-        week:weeks(*)
-      )
-    `)
-    .single()
-
-  if (error) throw error
-  return data
+    }
+    
+    const response = await fetch(
+      `${url}/rest/v1/task_submissions?id=eq.${submissionId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(payload)
+      }
+    )
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Failed to update review:', errorText)
+      throw new Error(`Failed to update review: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const submission = Array.isArray(data) ? data[0] : data
+    
+    console.log('Review updated successfully:', submission)
+    return submission
+  } catch (err: any) {
+    console.error('Error in updateSubmissionReview:', err)
+    throw err
+  }
 }
 
 // Get assignment by ID
 export async function getAssignmentById(assignmentId: string) {
-  const { data, error } = await supabase
-    .from('assignments')
-    .select(`
-      *,
-      week:weeks(
-        *,
-        track:tracks(*)
-      )
-    `)
-    .eq('id', assignmentId)
-    .single()
-
-  if (error) throw error
-  return data
+  console.log('getAssignmentById called for assignmentId:', assignmentId)
+  
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+    
+    const response = await fetch(
+      `${url}/rest/v1/assignments?id=eq.${assignmentId}&select=*,week:weeks(*,track:tracks(*))`,
+      {
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      }
+    )
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Failed to fetch assignment:', errorText)
+      throw new Error(`Failed to fetch assignment: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const assignment = Array.isArray(data) ? data[0] : data
+    
+    console.log('getAssignmentById result:', assignment)
+    return assignment
+  } catch (err: any) {
+    console.error('Error in getAssignmentById:', err)
+    throw err
+  }
 }
 
 // Get lesson by ID
 export async function getLessonById(lessonId: string) {
-  const { data, error } = await supabase
-    .from('lessons')
-    .select(`
-      *,
-      week:weeks(
-        *,
-        track:tracks(*)
-      )
-    `)
-    .eq('id', lessonId)
-    .single()
-
-  if (error) throw error
-  return data
+  console.log('getLessonById called for lessonId:', lessonId)
+  
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+    
+    // Fetch lesson with week and track data
+    const response = await fetch(
+      `${url}/rest/v1/lessons?id=eq.${lessonId}&select=*,week:weeks(*,track:tracks(*))`,
+      {
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      }
+    )
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Failed to fetch lesson:', errorText)
+      throw new Error(`Failed to fetch lesson: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const lesson = Array.isArray(data) ? data[0] : data
+    
+    console.log('getLessonById result:', { 
+      lesson, 
+      hasVideoUrls: !!lesson?.video_urls,
+      videoUrlsCount: lesson?.video_urls?.length || 0,
+      hasResourceLinks: !!lesson?.resource_links,
+      resourceLinksCount: lesson?.resource_links?.length || 0
+    })
+    
+    return lesson
+  } catch (err: any) {
+    console.error('Error in getLessonById:', err)
+    throw err
+  }
 }
 
 // Create task submission
@@ -988,18 +1619,56 @@ export async function createTaskSubmission(submissionData: {
   demo_url?: string
   notes?: string
 }) {
-  const { data, error } = await supabase
-    .from('task_submissions')
-    .insert({
+  console.log('createTaskSubmission called with:', submissionData)
+  
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+    
+    // Use anon key since RLS is disabled on task_submissions
+    const token = key
+    
+    const payload = {
       ...submissionData,
       status: 'in_review',
       submitted_at: new Date().toISOString()
-    })
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
+    }
+    
+    console.log('Submitting to task_submissions:', payload)
+    
+    const response = await fetch(
+      `${url}/rest/v1/task_submissions`,
+      {
+        method: 'POST',
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(payload)
+      }
+    )
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Failed to create submission:', errorText)
+      throw new Error(`Failed to create submission: ${response.status} - ${errorText}`)
+    }
+    
+    const data = await response.json()
+    const submission = Array.isArray(data) ? data[0] : data
+    
+    console.log('Submission created successfully:', submission)
+    return submission
+  } catch (err: any) {
+    console.error('Error in createTaskSubmission:', err)
+    throw err
+  }
 }
 
 // Update task submission
@@ -1008,54 +1677,126 @@ export async function updateTaskSubmission(submissionId: string, updates: {
   demo_url?: string
   notes?: string
 }) {
-  const { data, error } = await supabase
-    .from('task_submissions')
-    .update({
+  console.log('updateTaskSubmission called with:', { submissionId, updates })
+  
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+    
+    // Use anon key since RLS is disabled on task_submissions
+    const token = key
+    
+    const payload = {
       ...updates,
       status: 'in_review',
       submitted_at: new Date().toISOString()
-    })
-    .eq('id', submissionId)
-    .select()
-    .single()
-
-  if (error) throw error
-  return data
+    }
+    
+    const response = await fetch(
+      `${url}/rest/v1/task_submissions?id=eq.${submissionId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(payload)
+      }
+    )
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Failed to update submission:', errorText)
+      throw new Error(`Failed to update submission: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const submission = Array.isArray(data) ? data[0] : data
+    
+    console.log('Submission updated successfully:', submission)
+    return submission
+  } catch (err: any) {
+    console.error('Error in updateTaskSubmission:', err)
+    throw err
+  }
 }
 
 // Get student's submission for an assignment
 export async function getStudentSubmissionForAssignment(studentId: string, assignmentId: string) {
-  const { data, error } = await supabase
-    .from('task_submissions')
-    .select(`
-      *,
-      assignment:assignments(
-        *,
-        week:weeks(*)
-      )
-    `)
-    .eq('student_id', studentId)
-    .eq('assignment_id', assignmentId)
-    .single()
-
-  if (error && error.code !== 'PGRST116') throw error // PGRST116 is "not found"
-  return data
+  console.log('getStudentSubmissionForAssignment called:', { studentId, assignmentId })
+  
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+    
+    const response = await fetch(
+      `${url}/rest/v1/task_submissions?student_id=eq.${studentId}&assignment_id=eq.${assignmentId}&select=*,assignment:assignments(*,week:weeks(*))`,
+      {
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      }
+    )
+    
+    if (!response.ok) {
+      console.error('Failed to fetch submission')
+      return null
+    }
+    
+    const data = await response.json()
+    const submission = Array.isArray(data) && data.length > 0 ? data[0] : null
+    
+    console.log('Found existing submission:', submission)
+    return submission
+  } catch (err: any) {
+    console.error('Error in getStudentSubmissionForAssignment:', err)
+    return null
+  }
 }
 
 // Get week by ID with lessons and assignments
 export async function getWeekById(weekId: string) {
-  const { data, error } = await supabase
-    .from('weeks')
-    .select(`
-      *,
-      lessons(*),
-      assignments(*)
-    `)
-    .eq('id', weekId)
-    .single()
+  console.log('getWeekById called for weekId:', weekId)
+  
+  try {
+    const { data, error } = await supabase
+      .from('weeks')
+      .select(`
+        *,
+        lessons(*),
+        assignments(*),
+        track:tracks(*)
+      `)
+      .eq('id', weekId)
+      .single()
 
-  if (error) throw error
-  return data
+    console.log('getWeekById result:', { 
+      data, 
+      error,
+      lessonsCount: data?.lessons?.length || 0 
+    })
+
+    if (error) {
+      console.error('getWeekById error:', error)
+      throw error
+    }
+    
+    return data
+  } catch (err) {
+    console.error('getWeekById exception:', err)
+    throw err
+  }
 }
 
 // Cohort Management
@@ -1125,6 +1866,9 @@ export async function createTrack(trackData: {
       throw error
     }
     
+    // Invalidate tracks cache
+    dataCache.invalidate(CACHE_KEYS.TRACKS)
+    
     console.log('createTrack: Success, returning data:', data)
     return data
   } catch (err) {
@@ -1154,6 +1898,10 @@ export async function updateTrack(trackId: string, trackData: {
       throw error
     }
     
+    // Invalidate tracks cache
+    dataCache.invalidate(CACHE_KEYS.TRACKS)
+    dataCache.invalidatePattern(`weeks_track_${trackId}`)
+    
     console.log('updateTrack: Success, returning data:', data)
     return data
   } catch (err) {
@@ -1177,6 +1925,10 @@ export async function deleteTrack(trackId: string) {
       console.error('deleteTrack: Database error:', error)
       throw error
     }
+    
+    // Invalidate tracks cache
+    dataCache.invalidate(CACHE_KEYS.TRACKS)
+    dataCache.invalidatePattern(`weeks_track_${trackId}`)
     
     console.log('deleteTrack: Success')
     return true
@@ -1485,71 +2237,126 @@ export async function uploadSubmissionFile(studentId: string, assignmentId: stri
 
 // Admin Analytics
 export async function getAdminAnalytics(dateRange: string = '30d') {
-  const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90
-  const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  console.log('getAdminAnalytics called with dateRange:', dateRange)
+  
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
 
-  // Get submission metrics
-  const { data: submissions } = await supabase
-    .from('task_submissions')
-    .select('*')
-    .gte('submitted_at', startDate)
+    const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
-  const { data: allSubmissions } = await supabase
-    .from('task_submissions')
-    .select('*')
+    // OPTIMIZATION: Fetch all data in parallel
+    const [recentSubmissionsRes, allSubmissionsRes, recentActionsRes] = await Promise.all([
+      fetch(`${url}/rest/v1/task_submissions?submitted_at=gte.${startDate}&select=status`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      fetch(`${url}/rest/v1/task_submissions?select=id`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }),
+      fetch(`${url}/rest/v1/recent_admin_actions?select=*&limit=10`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      })
+    ])
 
-  // Get recent actions
-  const { data: recentActions } = await supabase
-    .from('recent_admin_actions')
-    .select('*')
-    .limit(10)
+    const recentSubmissions = await recentSubmissionsRes.json()
+    const allSubmissions = await allSubmissionsRes.json()
+    const recentActions = await recentActionsRes.json()
 
-  const totalSubmissions = allSubmissions?.length || 0
-  const recentSubmissions = submissions?.length || 0
-  const approvedSubmissions = submissions?.filter(s => s.status === 'approved').length || 0
-  const approvalRate = recentSubmissions > 0 ? Math.round((approvedSubmissions / recentSubmissions) * 100) : 0
+    const totalSubmissions = allSubmissions?.length || 0
+    const recentCount = recentSubmissions?.length || 0
+    const approvedSubmissions = recentSubmissions?.filter((s: any) => s.status === 'approved').length || 0
+    const approvalRate = recentCount > 0 ? Math.round((approvedSubmissions / recentCount) * 100) : 0
 
-  return {
-    engagementMetrics: {
-      totalSubmissions,
-      recentSubmissions,
-      approvalRate,
-      avgSubmissionsPerDay: Math.round(recentSubmissions / days)
-    },
-    recentActions: recentActions || []
+    return {
+      engagementMetrics: {
+        totalSubmissions,
+        recentSubmissions: recentCount,
+        approvalRate,
+        avgSubmissionsPerDay: Math.round(recentCount / days)
+      },
+      recentActions: recentActions || []
+    }
+  } catch (error) {
+    console.error('Error in getAdminAnalytics:', error)
+    // Return default values on error
+    return {
+      engagementMetrics: {
+        totalSubmissions: 0,
+        recentSubmissions: 0,
+        approvalRate: 0,
+        avgSubmissionsPerDay: 0
+      },
+      recentActions: []
+    }
   }
 }
 
 // Bulk Operations
 export async function bulkUpdateSubmissions(submissionIds: string[], action: string, reviewerId: string) {
-  const updates: any = {
-    reviewed_by: reviewerId,
-    reviewed_at: new Date().toISOString()
-  }
+  console.log('bulkUpdateSubmissions called:', { submissionIds, action, reviewerId })
+  
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!url || !key) {
+      throw new Error('Missing Supabase credentials')
+    }
+    
+    const updates: any = {
+      reviewed_by: reviewerId,
+      reviewed_at: new Date().toISOString()
+    }
 
-  if (action === 'approve') {
-    updates.status = 'approved'
-    updates.feedback = 'Bulk approved'
-  } else if (action === 'reject') {
-    updates.status = 'needs_changes'
-    updates.feedback = 'Please review and resubmit'
-  }
-
-  const { data, error } = await supabase
-    .from('task_submissions')
-    .update(updates)
-    .in('id', submissionIds)
-    .select(`
-      *,
-      student:profiles(*),
-      assignment:assignments(
-        *,
-        week:weeks(*)
+    if (action === 'approve') {
+      updates.status = 'approved'
+      updates.feedback = 'Bulk approved'
+    } else if (action === 'reject') {
+      updates.status = 'needs_changes'
+      updates.feedback = 'Please review and resubmit'
+    } else if (action === 'review') {
+      updates.status = 'in_review'
+      updates.feedback = 'Under review'
+    }
+    
+    // Update each submission individually using HTTP fetch
+    const updatePromises = submissionIds.map(async (submissionId) => {
+      const response = await fetch(
+        `${url}/rest/v1/task_submissions?id=eq.${submissionId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': key,
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(updates)
+        }
       )
-    `)
-
-  if (error) throw error
-  return data
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`Failed to update submission ${submissionId}:`, errorText)
+        throw new Error(`Failed to update submission: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      return Array.isArray(data) ? data[0] : data
+    })
+    
+    const results = await Promise.all(updatePromises)
+    console.log('Bulk update completed:', results.length, 'submissions updated')
+    return results
+  } catch (err: any) {
+    console.error('Error in bulkUpdateSubmissions:', err)
+    throw err
+  }
 }
 
 // Export Functions

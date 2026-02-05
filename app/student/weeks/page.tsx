@@ -17,12 +17,21 @@ export default function WeeksPage() {
       if (!user?.id) return
       
       try {
+        console.log('Loading weeks data for student:', user.id)
         const enrollmentData = await getStudentEnrollment(user.id)
-        if (!enrollmentData) return
+        if (!enrollmentData) {
+          console.log('No enrollment found for student')
+          return
+        }
         
+        console.log('Enrollment data:', enrollmentData)
         setEnrollment(enrollmentData)
         
+        console.log('Fetching weeks for track:', enrollmentData.track_id)
         const weeksData = await getWeeksByTrack(enrollmentData.track_id)
+        console.log('Weeks data received:', weeksData)
+        console.log('Lessons in weeks:', weeksData.map(w => ({ week: w.title, lessons: w.lessons?.length || 0 })))
+        
         const progressData = await getStudentWeekProgress(user.id)
         
         // Transform weeks to match the expected structure
@@ -45,6 +54,7 @@ export default function WeeksPage() {
           
           return {
             id: week.id,
+            week_number: week.week_number,
             title: week.title,
             description: week.description,
             status,
@@ -105,6 +115,38 @@ export default function WeeksPage() {
     )
   }
 
+  if (!enrollment) {
+    return (
+      <div className="p-4 md:p-8 max-w-4xl mx-auto">
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-4">No Enrollment Found</h2>
+          <p className="text-foreground/60 mb-6">
+            You are not enrolled in any track yet. Please contact your administrator.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (weeks.length === 0 && !loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-4xl mx-auto">
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2">Program Weeks</h1>
+          <p className="text-foreground/60 text-sm md:text-base">
+            {enrollment?.track?.name || 'Development'} Track
+          </p>
+        </div>
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-4">No Weeks Available Yet</h2>
+          <p className="text-foreground/60 mb-6">
+            Your instructor hasn't added any weeks to this track yet. Check back soon!
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
       {/* Header */}
@@ -144,7 +186,7 @@ export default function WeeksPage() {
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
-                    <h3 className="text-lg md:text-xl font-semibold">Week {week.id}: {week.title}</h3>
+                    <h3 className="text-lg md:text-xl font-semibold">Week {week.week_number}: {week.title}</h3>
                     {week.status === "current" && (
                       <span className="px-2 py-1 text-xs font-medium bg-primary text-primary-foreground rounded-full w-fit">
                         Current

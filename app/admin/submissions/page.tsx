@@ -30,36 +30,10 @@ export default function SubmissionsPage() {
       
       try {
         const submissionsData = await getTaskSubmissions()
+        console.log('Raw submissions data:', submissionsData)
         
-        // Transform submissions to match expected structure
-        const transformedSubmissions = submissionsData.map((sub: any) => ({
-          id: sub.id,
-          student: {
-            name: sub.student?.full_name || 'Unknown Student',
-            email: sub.student?.email || 'No email',
-            track: sub.assignment?.week?.track?.name || 'Unknown Track',
-            cohort: 'Cohort 1' // TODO: Get from enrollment data
-          },
-          assignment: {
-            id: sub.assignment?.id || 0,
-            title: sub.assignment?.title || 'Unknown Assignment',
-            week: sub.assignment?.week?.week_number || 0,
-            weekTitle: sub.assignment?.week?.title || 'Unknown Week'
-          },
-          submission: {
-            github: sub.github_url || '',
-            demo: sub.demo_url || '',
-            notes: sub.notes || ''
-          },
-          status: sub.status,
-          submittedDate: sub.submitted_at,
-          reviewedBy: sub.reviewed_by || null,
-          reviewedDate: sub.reviewed_at || null,
-          feedback: sub.feedback || null,
-          grade: sub.grade || null
-        }))
-        
-        setSubmissions(transformedSubmissions)
+        // Use the data directly - it's already enriched
+        setSubmissions(submissionsData)
       } catch (error) {
         console.error('Error loading submissions:', error)
         setSubmissions([])
@@ -75,7 +49,8 @@ export default function SubmissionsPage() {
 
   const filteredSubmissions = submissions.filter(sub => {
     const matchesStatus = filterStatus === "all" || sub.status === filterStatus
-    const matchesTrack = filterTrack === "all" || sub.student.track.toLowerCase() === filterTrack
+    const trackName = sub.assignment?.week?.track?.name?.toLowerCase() || ''
+    const matchesTrack = filterTrack === "all" || trackName.includes(filterTrack.toLowerCase())
     return matchesStatus && matchesTrack
   })
 
@@ -226,7 +201,7 @@ export default function SubmissionsPage() {
       }
       
       // Call the bulk update function with correct parameters
-      await bulkUpdateSubmissions(selectedSubmissions, updates)
+      await bulkUpdateSubmissions(selectedSubmissions, bulkAction, user.id)
       
       // Update local state
       setSubmissions(prev => prev.map(sub => 
@@ -265,14 +240,14 @@ export default function SubmissionsPage() {
     const csvData = [
       ['Student', 'Email', 'Track', 'Assignment', 'Status', 'Submitted Date', 'GitHub', 'Demo'],
       ...filteredSubmissions.map(sub => [
-        sub.student.name,
-        sub.student.email,
-        sub.student.track,
-        sub.assignment.title,
+        sub.student?.full_name || sub.student?.email || 'Unknown',
+        sub.student?.email || '',
+        sub.assignment?.week?.track?.name || 'Unknown',
+        sub.assignment?.title || '',
         sub.status,
-        new Date(sub.submittedDate).toLocaleDateString(),
-        sub.submission.github || '',
-        sub.submission.demo || ''
+        new Date(sub.submitted_at).toLocaleDateString(),
+        sub.github_url || '',
+        sub.demo_url || ''
       ])
     ]
     
@@ -479,11 +454,13 @@ export default function SubmissionsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
                       <div>
                         <span className="font-medium">Student:</span>
-                        <p className="text-foreground/80">{sub.student?.full_name || 'Unknown'} ({sub.student?.email || 'N/A'})</p>
+                        <p className="text-foreground/80">{sub.student?.full_name || sub.student?.email || 'Unknown'} ({sub.student?.email || 'N/A'})</p>
                       </div>
                       <div>
                         <span className="font-medium">Track & Week:</span>
-                        <p className="text-foreground/80">Week {sub.assignment?.week?.week_number || 'N/A'}: {sub.assignment?.week?.title || 'N/A'}</p>
+                        <p className="text-foreground/80">
+                          {sub.assignment?.week?.track?.name || 'Unknown Track'} - Week {sub.assignment?.week?.week_number || 'N/A'}: {sub.assignment?.week?.title || 'N/A'}
+                        </p>
                       </div>
                       <div>
                         <span className="font-medium">Submitted:</span>
