@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Github, Linkedin, MessageCircle } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { getAccountabilityPartner } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function AccountabilityPage() {
   const { user, loading: authLoading } = useAuth()
@@ -38,7 +39,7 @@ export default function AccountabilityPage() {
           setPartner(mockPartner)
         }
       } catch (error) {
-        console.error('Error loading accountability partner:', error)
+        logger.error('Error loading accountability partner:', error)
       } finally {
         setLoading(false)
       }

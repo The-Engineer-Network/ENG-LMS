@@ -56,7 +56,6 @@ export default function ClarityCallsPage() {
           setWeeks(mockWeeks)
         }
       } catch (error) {
-        console.error('Error loading clarity calls data:', error)
       } finally {
         setLoading(false)
       }
@@ -96,7 +95,6 @@ export default function ClarityCallsPage() {
       setShowRequestForm(false)
       alert('Clarity call request submitted successfully!')
     } catch (error) {
-      console.error('Error submitting request:', error)
       alert('Failed to submit request')
     } finally {
       setLoading(false)

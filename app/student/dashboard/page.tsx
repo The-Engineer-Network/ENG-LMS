@@ -22,7 +22,7 @@ export default function StudentDashboard() {
       if (!user?.id) return
       
       try {
-        console.log('Loading dashboard data...')
+        logger.log('Loading dashboard data...')
         const startTime = Date.now()
         
         const [data, achievementsData] = await Promise.all([
@@ -31,7 +31,6 @@ export default function StudentDashboard() {
         ])
         
         const loadTime = Date.now() - startTime
-        console.log(`Dashboard data loaded in ${loadTime}ms`)
         
         if (mounted) {
           setDashboardData(data)
@@ -39,12 +38,12 @@ export default function StudentDashboard() {
           setLoading(false)
         }
       } catch (error) {
-        console.error('Error loading dashboard data:', error)
+        logger.error('Error loading dashboard data:', error)
         
         // Retry logic for network errors
         if (retryCount < maxRetries && mounted) {
           retryCount++
-          console.log(`Retrying... (${retryCount}/${maxRetries})`)
+          logger.log(`Retrying... (${retryCount}/${maxRetries})`)
           setTimeout(() => loadDashboardData(), 1000 * retryCount)
         } else if (mounted) {
           setLoading(false)

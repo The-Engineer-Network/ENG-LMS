@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logger } from "@/lib/logger"
 
 export interface UploadResult {
   url: string
@@ -132,7 +133,7 @@ export async function downloadFile(bucket: string, path: string): Promise<Blob |
     if (error) throw error
     return data
   } catch (error) {
-    console.error('Error downloading file:', error)
+    logger.error('Error downloading file:', error)
     return null
   }
 }
@@ -147,7 +148,7 @@ export async function deleteFile(bucket: string, path: string): Promise<boolean>
     if (error) throw error
     return true
   } catch (error) {
-    console.error('Error deleting file:', error)
+    logger.error('Error deleting file:', error)
     return false
   }
 }
@@ -210,7 +211,7 @@ export async function downloadCertificateFile(certificateUrl: string, fileName: 
     
     return { success: true }
   } catch (error) {
-    console.error('Error downloading certificate:', error)
+    logger.error('Error downloading certificate:', error)
     throw error
   }
 }

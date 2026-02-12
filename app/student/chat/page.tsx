@@ -6,6 +6,7 @@ import Image from "next/image"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useChat } from "@/lib/hooks/useChat"
 import { getAccountabilityPartner } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function ChatPage() {
   const { user, loading: authLoading } = useAuth()
@@ -48,7 +49,7 @@ export default function ChatPage() {
           setPartner({ ...partnerData, ...mockAccountabilityPartner })
         }
       } catch (error) {
-        console.error('Error loading partner:', error)
+        logger.error('Error loading partner:', error)
       } finally {
         setLoading(false)
       }
@@ -77,7 +78,7 @@ export default function ChatPage() {
       setNewMessage("")
       setSelectedFiles([])
     } catch (error) {
-      console.error('Error sending message:', error)
+      logger.error('Error sending message:', error)
     }
   }
 

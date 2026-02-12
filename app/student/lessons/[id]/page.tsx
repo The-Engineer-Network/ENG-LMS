@@ -6,6 +6,7 @@ import { useParams } from "next/navigation"
 import { ArrowLeft, Play, FileText, Clock, BookOpen, ExternalLink } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { getLessonById } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 // Helper function to extract YouTube video ID
 function getYouTubeVideoId(url: string): string | null {
@@ -56,7 +57,7 @@ export default function LessonDetailPage() {
         const lessonData = await getLessonById(lessonId)
         setLesson(lessonData)
       } catch (error) {
-        console.error('Error loading lesson:', error)
+        logger.error('Error loading lesson:', error)
       } finally {
         setLoading(false)
       }
@@ -84,14 +85,14 @@ export default function LessonDetailPage() {
   
   const videos = uniqueVideos
 
-  console.log('=== VIDEO DISPLAY DEBUG ===')
-  console.log('Lesson data:', lesson)
-  console.log('video_url (legacy):', lesson?.video_url)
-  console.log('video_urls (new):', lesson?.video_urls)
-  console.log('Legacy videos:', legacyVideo)
-  console.log('New videos:', newVideos)
-  console.log('Combined unique videos:', videos)
-  console.log('Videos count:', videos.length)
+  logger.log('=== VIDEO DISPLAY DEBUG ===')
+  logger.log('Lesson data:', lesson)
+  logger.log('video_url (legacy):', lesson?.video_url)
+  logger.log('video_urls (new):', lesson?.video_urls)
+  logger.log('Legacy videos:', legacyVideo)
+  logger.log('New videos:', newVideos)
+  logger.log('Combined unique videos:', videos)
+  logger.log('Videos count:', videos.length)
 
   const resourceLinks = lesson?.resource_links || []
 

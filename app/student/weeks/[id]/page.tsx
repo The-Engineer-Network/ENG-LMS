@@ -6,6 +6,7 @@ import { useParams } from "next/navigation"
 import { ArrowLeft, Play, FileText, Clock, CheckCircle2, Lock, Calendar, User } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { getWeekById, getStudentWeekProgress } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function WeekDetailPage() {
   const { user, loading: authLoading } = useAuth()
@@ -21,21 +22,21 @@ export default function WeekDetailPage() {
       if (!user?.id || !weekId) return
       
       try {
-        console.log('Loading week detail for weekId:', weekId)
+        logger.log('Loading week detail for weekId:', weekId)
         const [weekData, progressData] = await Promise.all([
           getWeekById(weekId),
           getStudentWeekProgress(user.id)
         ])
         
-        console.log('Week data received:', weekData)
-        console.log('Lessons in week:', weekData?.lessons?.length || 0)
-        console.log('Lessons:', weekData?.lessons)
+        logger.log('Week data received:', weekData)
+        logger.log('Lessons in week:', weekData?.lessons?.length || 0)
+        logger.log('Lessons:', weekData?.lessons)
         
         setWeek(weekData)
         const weekProgress = progressData.find((p: any) => p.week_id === weekId)
         setProgress(weekProgress)
       } catch (error) {
-        console.error('Error loading week detail:', error)
+        logger.error('Error loading week detail:', error)
       } finally {
         setLoading(false)
       }

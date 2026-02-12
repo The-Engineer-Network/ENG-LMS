@@ -5,6 +5,7 @@ import { Download, Lock, Award, CheckCircle2 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { getStudentCertificate } from "@/lib/data"
 import { downloadCertificateFile } from "@/lib/storage"
+import { logger } from "@/lib/logger"
 
 export default function CertificatePage() {
   const { user, loading: authLoading } = useAuth()
@@ -44,7 +45,7 @@ export default function CertificatePage() {
           })
         }
       } catch (error) {
-        console.error('Error loading certificate:', error)
+        logger.error('Error loading certificate:', error)
         // Set default data on error
         setCertificate({
           isApproved: false,
@@ -71,7 +72,7 @@ export default function CertificatePage() {
       try {
         await downloadCertificateFile(certificate.certificateFile, `${certificate.student.name}-certificate.pdf`)
       } catch (error) {
-        console.error('Error downloading certificate:', error)
+        logger.error('Error downloading certificate:', error)
       }
     }
   }

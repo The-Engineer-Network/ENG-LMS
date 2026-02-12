@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { getChatMessages, sendChatMessage } from '../data'
+import { logger } from "@/lib/logger"
 
 export interface ChatMessage {
   id: string
@@ -59,7 +60,7 @@ export function useChat(userId: string, partnerId: string) {
       const data = await getChatMessages(userId, partnerId)
       setMessages(data || [])
     } catch (error) {
-      console.error('Error loading messages:', error)
+      logger.error('Error loading messages:', error)
     } finally {
       setLoading(false)
     }
@@ -78,7 +79,7 @@ export function useChat(userId: string, partnerId: string) {
 
       return messageData
     } catch (error) {
-      console.error('Error sending message:', error)
+      logger.error('Error sending message:', error)
       throw error
     }
   }

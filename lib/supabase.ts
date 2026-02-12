@@ -1,20 +1,21 @@
 'use client'
 
 import { createClient } from '@supabase/supabase-js'
+import { logger } from "@/lib/logger"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-console.log('🔧 Supabase client initialization')
-console.log('URL:', supabaseUrl)
-console.log('Key exists:', !!supabaseAnonKey)
-console.log('Key length:', supabaseAnonKey?.length)
-console.log('Running on:', typeof window !== 'undefined' ? 'client' : 'server')
+logger.log('🔧 Supabase client initialization')
+logger.log('URL:', supabaseUrl)
+logger.log('Key exists:', !!supabaseAnonKey)
+logger.log('Key length:', supabaseAnonKey?.length)
+logger.log('Running on:', typeof window !== 'undefined' ? 'client' : 'server')
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ CRITICAL: Supabase credentials are missing!')
-  console.error('URL:', supabaseUrl)
-  console.error('Key:', supabaseAnonKey ? 'exists' : 'MISSING')
+  logger.error('❌ CRITICAL: Supabase credentials are missing!')
+  logger.error('URL:', supabaseUrl)
+  logger.error('Key:', supabaseAnonKey ? 'exists' : 'MISSING')
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -29,8 +30,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 })
 
-console.log('✅ Supabase client created:', typeof supabase)
-console.log('Has rpc method:', typeof supabase.rpc === 'function')
+logger.log('✅ Supabase client created:', typeof supabase)
+logger.log('Has rpc method:', typeof supabase.rpc === 'function')
 
 // Database types matching our schema
 export interface User {

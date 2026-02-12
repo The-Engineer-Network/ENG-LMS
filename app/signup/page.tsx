@@ -9,6 +9,7 @@ import { GraduationCap, Mail, Lock, User, BookOpen, Users, AlertCircle, ArrowLef
 import { getTracks, getCohorts, checkWhitelistStatus } from "../../lib/data"
 import { signUp } from "../../lib/auth"
 import type { Track, Cohort } from "../../lib/supabase"
+import { logger } from "@/lib/logger"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -37,7 +38,7 @@ export default function SignupPage() {
         setTracks(tracksData)
         setCohorts(cohortsData)
       } catch (error) {
-        console.error('Error loading data:', error)
+        logger.error('Error loading data:', error)
       }
     }
     loadData()

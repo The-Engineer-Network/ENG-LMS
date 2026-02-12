@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { CheckCircle, Clock, AlertCircle, BookOpen, Users, Calendar, Trophy } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { logger } from "@/lib/logger"
 
 interface EnrollmentData {
   id: string
@@ -75,7 +76,7 @@ export default function EnrollmentStatus({ userId }: EnrollmentStatusProps) {
         .order('week(week_number)')
 
       if (progressError) {
-        console.warn('Could not fetch week progress:', progressError)
+        logger.warn('Could not fetch week progress:', progressError)
       }
 
       // Combine data
@@ -98,7 +99,7 @@ export default function EnrollmentStatus({ userId }: EnrollmentStatusProps) {
 
       setEnrollment(combinedData)
     } catch (err: any) {
-      console.error('Error fetching enrollment data:', err)
+      logger.error('Error fetching enrollment data:', err)
       setError(err.message || 'Failed to load enrollment data')
     } finally {
       setLoading(false)

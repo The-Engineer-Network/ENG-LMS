@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Users, CheckSquare, Award, TrendingUp, BarChart3, PieChart, Calendar, Download, Filter } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { getAdminDashboardData, getAdminAnalytics, exportAdminReport } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function AdminDashboard() {
   const { user, loading: authLoading } = useAuth()
@@ -22,7 +23,6 @@ export default function AdminDashboard() {
       if (!user?.id || user.role !== 'admin') return
       
       try {
-        console.log('Loading admin dashboard data...')
         const startTime = Date.now()
         
         const [data, analyticsData] = await Promise.all([
@@ -31,7 +31,6 @@ export default function AdminDashboard() {
         ])
         
         const loadTime = Date.now() - startTime
-        console.log(`Admin dashboard data loaded in ${loadTime}ms`)
         
         if (mounted) {
           // Transform to match expected structure
@@ -49,12 +48,9 @@ export default function AdminDashboard() {
           setLoading(false)
         }
       } catch (error) {
-        console.error('Error loading dashboard data:', error)
-        
         // Retry logic for network errors
         if (retryCount < maxRetries && mounted) {
           retryCount++
-          console.log(`Retrying... (${retryCount}/${maxRetries})`)
           setTimeout(() => loadDashboardData(), 1000 * retryCount)
         } else if (mounted) {
           setLoading(false)
@@ -83,7 +79,7 @@ export default function AdminDashboard() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (error) {
-      console.error('Export failed:', error)
+      // Export failed
     } finally {
       setExportLoading(false)
     }

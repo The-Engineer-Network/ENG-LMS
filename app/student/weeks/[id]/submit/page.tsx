@@ -7,6 +7,7 @@ import Link from "next/link"
 import { Github, LinkIcon, Send, ChevronLeft } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { getWeeksByTrack, getStudentEnrollment, getStudentSubmissionForAssignment, createTaskSubmission, updateTaskSubmission } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function WeekSubmitPage({ params }: { params: { id: string } }) {
   const { user, loading: authLoading } = useAuth()
@@ -52,7 +53,7 @@ export default function WeekSubmitPage({ params }: { params: { id: string } }) {
           }
         }
       } catch (error) {
-        console.error('Error loading week data:', error)
+        logger.error('Error loading week data:', error)
       } finally {
         setLoading(false)
       }
@@ -97,7 +98,7 @@ export default function WeekSubmitPage({ params }: { params: { id: string } }) {
       
       router.push('/student/dashboard')
     } catch (error) {
-      console.error('Error submitting assignment:', error)
+      logger.error('Error submitting assignment:', error)
       alert('Failed to submit assignment. Please try again.')
     } finally {
       setSubmitting(false)

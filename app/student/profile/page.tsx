@@ -5,6 +5,7 @@ import { User, Mail, MapPin, Github, Linkedin, Save, Upload } from "lucide-react
 import { useAuth } from "@/lib/hooks/useAuth"
 import { getUserProfile, updateUserProfile, getStudentEnrollment } from "@/lib/data"
 import { uploadProfilePicture } from "@/lib/storage"
+import { logger } from "@/lib/logger"
 
 export default function ProfilePage() {
   const { user, loading: authLoading } = useAuth()
@@ -40,7 +41,7 @@ export default function ProfilePage() {
           setEnrollment(enrollmentData)
         }
       } catch (error) {
-        console.error('Error loading profile:', error)
+        logger.error('Error loading profile:', error)
       } finally {
         setLoading(false)
       }
@@ -64,7 +65,7 @@ export default function ProfilePage() {
       })
       setIsEditing(false)
     } catch (error) {
-      console.error('Error saving profile:', error)
+      logger.error('Error saving profile:', error)
     } finally {
       setSaving(false)
     }
@@ -81,7 +82,7 @@ export default function ProfilePage() {
         setProfile((prev: any) => ({ ...prev, profile_picture_url: result.url }))
       }
     } catch (error) {
-      console.error('Error uploading profile picture:', error)
+      logger.error('Error uploading profile picture:', error)
     } finally {
       setUploading(false)
     }

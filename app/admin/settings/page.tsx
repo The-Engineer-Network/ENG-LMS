@@ -46,7 +46,6 @@ export default function SettingsPage() {
           certificateApprovalRequired: settingsData.certificate_approval_required ?? true,
         })
       } catch (error) {
-        console.error('Error loading settings:', error)
         showToast({
           type: 'error',
           title: 'Loading Failed',
@@ -88,8 +87,6 @@ export default function SettingsPage() {
         message: 'Your admin settings have been successfully updated.'
       })
     } catch (error: any) {
-      console.error('Error saving settings:', error)
-      
       if (error.message?.includes('permission denied') || error.code === '42501') {
         showToast({
           type: 'error',

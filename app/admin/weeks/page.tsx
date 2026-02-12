@@ -7,6 +7,7 @@ import { getTracks, getAllWeeks, createWeek, updateWeek, deleteWeek, createLesso
 import { useToast } from "@/components/ui/toast"
 import { MultiVideoInput } from "@/components/MultiVideoInput"
 import { MultiLinkInput } from "@/components/MultiLinkInput"
+import { logger } from "@/lib/logger"
 
 function AddTaskModal({
   isOpen,
@@ -274,7 +275,6 @@ export default function WeeksManagementPage() {
           setSelectedTrack(tracksData[0].id)
         }
       } catch (error) {
-        console.error('Error loading data:', error)
         setTracks([])
         setWeeks([])
       } finally {
@@ -329,7 +329,6 @@ export default function WeeksManagementPage() {
       setEditingWeek(null)
       setShowWeekForm(false)
     } catch (error) {
-      console.error('Error saving week:', error)
       alert('Failed to save week')
     }
   }
@@ -337,7 +336,6 @@ export default function WeeksManagementPage() {
   const handleLessonSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedWeekId) {
-      console.error('No selectedWeekId for lesson creation')
       showToast({
         type: 'error',
         title: 'Error',
@@ -349,13 +347,7 @@ export default function WeeksManagementPage() {
     setSavingLesson(true)
     
     try {
-      console.log('=== LESSON SUBMISSION DEBUG ===')
-      console.log('lessonForm.videoUrls:', JSON.stringify(lessonForm.videoUrls, null, 2))
-      console.log('lessonForm.resourceLinks:', JSON.stringify(lessonForm.resourceLinks, null, 2))
-      console.log('Full lessonForm:', lessonForm)
-      
       if (editingLesson) {
-        console.log('Updating existing lesson...')
         const updateData = {
           title: lessonForm.title,
           type: lessonForm.type as 'video' | 'text',
@@ -366,10 +358,8 @@ export default function WeeksManagementPage() {
           duration: lessonForm.duration,
           order_index: lessonForm.order
         }
-        console.log('Update data being sent:', JSON.stringify(updateData, null, 2))
         
         const result = await updateLesson(editingLesson.id, updateData)
-        console.log('Lesson update result:', result)
         
         showToast({
           type: 'success',
@@ -377,7 +367,6 @@ export default function WeeksManagementPage() {
           message: `"${lessonForm.title}" has been successfully updated.`
         })
       } else {
-        console.log('Creating new lesson...')
         const createData = {
           title: lessonForm.title,
           type: lessonForm.type as 'video' | 'text',
@@ -389,11 +378,8 @@ export default function WeeksManagementPage() {
           week_id: selectedWeekId,
           order_index: lessonForm.order
         }
-        console.log('Create data being sent:', JSON.stringify(createData, null, 2))
         
         const result = await createLesson(createData)
-        
-        console.log('Lesson created successfully:', result)
         
         showToast({
           type: 'success',
@@ -403,11 +389,11 @@ export default function WeeksManagementPage() {
       }
       
       // Refresh the page to show updated data
-      console.log('Refreshing page...')
+      logger.log('Refreshing page...')
       window.location.reload()
     } catch (error: any) {
-      console.error('Error saving lesson:', error)
-      console.error('Error details:', {
+      logger.error('Error saving lesson:', error)
+      logger.error('Error details:', {
         message: error?.message,
         code: error?.code,
         details: error?.details,
@@ -455,7 +441,6 @@ export default function WeeksManagementPage() {
   }
 
   const handleEditAssignment = (assignment: any) => {
-    console.log('Editing assignment from weeks page:', assignment)
     setEditingAssignment(assignment)
     setShowAssignmentModal(true)
   }
@@ -464,8 +449,6 @@ export default function WeeksManagementPage() {
     if (!editingAssignment) return
     
     try {
-      console.log('Updating assignment:', editingAssignment.id, assignmentData)
-      
       await updateAssignment(editingAssignment.id, {
         title: assignmentData.title,
         requirements: assignmentData.requirements,
@@ -487,7 +470,6 @@ export default function WeeksManagementPage() {
         message: `"${assignmentData.title}" has been successfully updated.`
       })
     } catch (error) {
-      console.error('Error updating assignment:', error)
       showToast({
         type: 'error',
         title: 'Update Failed',
@@ -513,7 +495,6 @@ export default function WeeksManagementPage() {
       
       alert('Week deleted successfully!')
     } catch (error) {
-      console.error('Error deleting week:', error)
       alert('Failed to delete week. Please try again.')
     }
   }
@@ -535,7 +516,6 @@ export default function WeeksManagementPage() {
       
       alert('Lesson deleted successfully!')
     } catch (error) {
-      console.error('Error deleting lesson:', error)
       alert('Failed to delete lesson. Please try again.')
     }
   }
@@ -983,7 +963,6 @@ export default function WeeksManagementPage() {
                     <MultiVideoInput
                       videos={lessonForm.videoUrls}
                       onChange={(videos) => {
-                        console.log('MultiVideoInput onChange called with:', videos)
                         setLessonForm(prev => ({ ...prev, videoUrls: videos }))
                       }}
                       maxVideos={5}

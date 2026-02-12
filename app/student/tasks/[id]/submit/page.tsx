@@ -7,6 +7,7 @@ import { ArrowLeft, Send, Save, Github, Globe, FileText } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useToast } from "@/components/ui/toast"
 import { getAssignmentById, getStudentSubmissionForAssignment, createTaskSubmission, updateTaskSubmission } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function SubmitTaskPage() {
   const { user, loading: authLoading } = useAuth()
@@ -48,7 +49,7 @@ export default function SubmitTaskPage() {
           })
         }
       } catch (error) {
-        console.error('Error loading data:', error)
+        logger.error('Error loading data:', error)
       } finally {
         setLoading(false)
       }
@@ -111,7 +112,7 @@ export default function SubmitTaskPage() {
       router.push(`/student/tasks/${taskId}`)
       
     } catch (error: any) {
-      console.error('Error submitting:', error)
+      logger.error('Error submitting:', error)
       showToast({
         type: 'error',
         title: 'Submission Failed',

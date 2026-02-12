@@ -7,6 +7,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { GraduationCap, Mail, Lock, LogIn, ArrowLeft, AlertCircle, User, Shield } from "lucide-react"
 import { signIn } from "../../lib/auth"
+import { logger } from "@/lib/logger"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -22,20 +23,20 @@ export default function LoginPage() {
     setError("")
 
     try {
-      console.log('Attempting login for:', email)
+      logger.log('Attempting login for:', email)
       const { data, error: signInError } = await signIn(email, password)
       
-      console.log('Login page received data:', { data, error: signInError })
-      console.log('data?.user exists:', !!data?.user)
-      console.log('data.user details:', data?.user)
+      logger.log('Login page received data:', { data, error: signInError })
+      logger.log('data?.user exists:', !!data?.user)
+      logger.log('data.user details:', data?.user)
       
       if (signInError) {
-        console.error('SignIn error:', signInError)
+        logger.error('SignIn error:', signInError)
         throw signInError
       }
       
       if (data?.user) {
-        console.log('User signed in:', data.user.id, data.user.email)
+        logger.log('User signed in:', data.user.id, data.user.email)
         
         // Get user profile to determine role using direct HTTP fetch
         try {
@@ -59,20 +60,20 @@ export default function LoginPage() {
           const profiles = await profileRes.json()
           const profile = Array.isArray(profiles) && profiles.length > 0 ? profiles[0] : null
           
-          console.log('Profile lookup result:', profile)
+          logger.log('Profile lookup result:', profile)
 
           // If profile exists, use the role
           if (profile?.role) {
-            console.log('User role:', profile.role)
+            logger.log('User role:', profile.role)
             if (profile.role === 'admin') {
-              console.log('Redirecting to admin dashboard')
+              logger.log('Redirecting to admin dashboard')
               router.push("/admin/dashboard")
             } else {
-              console.log('Redirecting to student dashboard')
+              logger.log('Redirecting to student dashboard')
               router.push("/student/dashboard")
             }
           } else {
-            console.log('No profile found, creating one')
+            logger.log('No profile found, creating one')
             // If no profile exists, create one
             const role = data.user.email?.includes('admin') ? 'admin' : 'student'
             
@@ -95,13 +96,13 @@ export default function LoginPage() {
 
             // If profile already exists (409 conflict), that's fine - just proceed
             if (!createRes.ok && createRes.status !== 409) {
-              console.error('Error creating profile:', await createRes.text())
+              logger.error('Error creating profile:', await createRes.text())
               setError("Error setting up user profile. Please contact support.")
               setLoading(false)
               return
             }
             
-            console.log('Profile created or already exists, redirecting...')
+            logger.log('Profile created or already exists, redirecting...')
             if (role === 'admin') {
               router.push("/admin/dashboard")
             } else {
@@ -109,19 +110,19 @@ export default function LoginPage() {
             }
           }
         } catch (profileError: any) {
-          console.error('Profile lookup error:', profileError)
+          logger.error('Profile lookup error:', profileError)
           setError("Error accessing user profile. Please try again.")
           setLoading(false)
           return
         }
       } else {
-        console.error('No user data returned from signIn')
-        console.error('Full data object:', data)
+        logger.error('No user data returned from signIn')
+        logger.error('Full data object:', data)
         setError("Login failed. Please check your credentials.")
         setLoading(false)
       }
     } catch (error: any) {
-      console.error('Login error:', error)
+      logger.error('Login error:', error)
       setError(error.message || "Invalid email or password")
       setLoading(false)
     }

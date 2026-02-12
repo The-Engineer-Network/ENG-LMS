@@ -5,6 +5,7 @@ import { Search, Plus, Edit2, Trash2 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useToast } from "@/components/ui/toast"
 import { getStudentEnrollments, getTracks, getCohorts, createStudentEnrollment, updateStudentEnrollment, deleteStudentEnrollment } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function StudentsPage() {
   const { user, loading: authLoading } = useAuth()
@@ -24,18 +25,11 @@ export default function StudentsPage() {
       if (!user?.id) return
       
       try {
-        console.log('Loading students page data...')
-        
         // Load tracks and cohorts separately to avoid failure cascade
         const [tracksData, cohortsData] = await Promise.all([
           getTracks(),
           getCohorts()
         ])
-        
-        console.log('Loaded tracks and cohorts:', {
-          tracks: tracksData,
-          cohorts: cohortsData
-        })
         
         setTracks(tracksData)
         setCohorts(cohortsData)
@@ -43,7 +37,6 @@ export default function StudentsPage() {
         // Try to load students separately - if it fails, we still have tracks/cohorts
         try {
           const studentsData = await getStudentEnrollments()
-          console.log('Loaded students:', studentsData)
           
           // Transform students to match expected structure
           const transformedStudents = studentsData.map((enrollment: any) => ({
@@ -59,16 +52,9 @@ export default function StudentsPage() {
           
           setStudents(transformedStudents)
         } catch (studentsError) {
-          console.error('Error loading students (but tracks/cohorts loaded):', studentsError)
           setStudents([]) // Empty students list, but tracks/cohorts still work
         }
-        
-        console.log('Final state:', {
-          tracksCount: tracksData.length,
-          cohortsCount: cohortsData.length
-        })
       } catch (error: any) {
-        console.error('Error loading tracks/cohorts:', error)
         setStudents([])
         setTracks([])
         setCohorts([])
@@ -86,7 +72,6 @@ export default function StudentsPage() {
     const student = students.find(s => s.id === studentId)
     setSelectedStudent(student)
     setShowEditModal(true)
-    console.log("Edit student:", studentId)
   }
 
   const handleDeleteStudent = async (studentId: string) => {
@@ -105,7 +90,6 @@ export default function StudentsPage() {
         })
       }
     } catch (error: any) {
-      console.error('Error deleting student:', error)
       showToast({
         type: 'error',
         title: 'Deletion Failed',
@@ -115,9 +99,6 @@ export default function StudentsPage() {
   }
 
   const handleAddStudent = () => {
-    console.log('Opening add student modal')
-    console.log('Available tracks:', tracks)
-    console.log('Available cohorts:', cohorts)
     setShowAddModal(true)
   }
 
@@ -147,7 +128,6 @@ export default function StudentsPage() {
       setShowEditModal(false)
       setSelectedStudent(null)
     } catch (error: any) {
-      console.error('Error updating student:', error)
       showToast({
         type: 'error',
         title: 'Update Failed',
@@ -190,7 +170,7 @@ export default function StudentsPage() {
       
       setShowAddModal(false)
     } catch (error: any) {
-      console.error('Error creating student:', error)
+      logger.error('Error creating student:', error)
       showToast({
         type: 'error',
         title: 'Enrollment Failed',

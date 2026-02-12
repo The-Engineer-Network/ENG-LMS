@@ -5,6 +5,7 @@ import Link from "next/link"
 import { CheckCircle2, Circle, Eye, Send, Clock, FileText } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { getStudentAssignments } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function TasksPage() {
   const { user, loading: authLoading } = useAuth()
@@ -17,12 +18,12 @@ export default function TasksPage() {
       if (!user?.id) return
       
       try {
-        console.log('Loading assignments for student:', user.id)
+        logger.log('Loading assignments for student:', user.id)
         const data = await getStudentAssignments(user.id)
-        console.log('Loaded assignments:', data)
+        logger.log('Loaded assignments:', data)
         setAssignments(data)
       } catch (error) {
-        console.error('Error loading assignments:', error)
+        logger.error('Error loading assignments:', error)
         setAssignments([])
       } finally {
         setLoading(false)

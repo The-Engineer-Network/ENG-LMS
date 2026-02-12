@@ -36,15 +36,12 @@ export async function signUp(email: string, password: string, fullName: string, 
     })
 
     if (authError) {
-      console.error('Auth signup error:', authError)
       throw new Error(authError.message || 'Failed to create account')
     }
 
     if (!authData.user) {
       throw new Error('No user data returned from signup')
     }
-
-    console.log('Auth user created successfully:', authData.user.id)
     
     // CRITICAL: Create profile explicitly - this will trigger automatic enrollment
     try {
@@ -60,10 +57,7 @@ export async function signUp(email: string, password: string, fullName: string, 
         .single()
 
       if (profileError) {
-        console.error('Profile creation error:', profileError)
         // Profile might already exist, try to fetch it
-        console.log('Attempting to fetch existing profile...')
-        
         const { data: existingProfile, error: fetchError } = await supabase
           .from('profiles')
           .select('*')
@@ -71,16 +65,10 @@ export async function signUp(email: string, password: string, fullName: string, 
           .single()
         
         if (fetchError || !existingProfile) {
-          console.error('Could not create or find profile:', fetchError)
           // Continue anyway - we'll create enrollment manually
-        } else {
-          console.log('Found existing profile:', existingProfile)
         }
-      } else {
-        console.log('Profile created successfully:', profileData)
       }
     } catch (profileErr: any) {
-      console.error('Profile handling error:', profileErr)
       // Continue anyway - enrollment might still work
     }
     
@@ -97,8 +85,6 @@ export async function signUp(email: string, password: string, fullName: string, 
       .single()
 
     if (enrollmentCheckError || !enrollmentCheck) {
-      console.log('Automatic enrollment not found, creating manually...')
-      
       // Fallback: Create enrollment manually if trigger didn't work
       const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('student_enrollments')
@@ -116,11 +102,8 @@ export async function signUp(email: string, password: string, fullName: string, 
         .single()
 
       if (enrollmentError) {
-        console.error('Failed to create manual enrollment:', enrollmentError)
-        throw new Error(`Account created but enrollment failed. Please contact support with your email: ${email}`)
+        throw new Error(`Account created but enrollment failed. Please contact support.`)
       }
-
-      console.log('Manual enrollment created successfully:', enrollmentData)
       
       // Initialize week progress manually
       try {
@@ -142,53 +125,34 @@ export async function signUp(email: string, password: string, fullName: string, 
             .insert(weekProgressData)
           
           if (progressError) {
-            console.warn('Failed to initialize week progress:', progressError)
-          } else {
-            console.log('Week progress initialized successfully')
+            // Week progress initialization failed, but continue
           }
         }
       } catch (progressInitError) {
-        console.warn('Error initializing week progress:', progressInitError)
+        // Error initializing week progress, but continue
       }
-    } else {
-      console.log('Automatic enrollment found:', enrollmentCheck)
     }
 
     return authData
   } catch (error: any) {
-    console.error('SignUp error:', error)
     throw error
   }
 }
 
 export async function signIn(email: string, password: string) {
-  console.log('signIn function called with email:', email)
-  
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
 
-  console.log('Supabase signIn response:', { data, error })
-  console.log('Data object details:', {
-    hasData: !!data,
-    hasUser: !!data?.user,
-    hasSession: !!data?.session,
-    user: data?.user,
-    session: data?.session
-  })
-
   if (error) {
-    console.error('Supabase signIn error:', error)
     throw error
   }
 
   if (!data.user) {
-    console.error('No user in signIn response data:', data)
     throw new Error('Authentication failed - no user data returned')
   }
 
-  console.log('Returning data from signIn:', data)
   return { data, error: null }
 }
 

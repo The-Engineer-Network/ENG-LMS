@@ -5,6 +5,7 @@ import { Users, RotateCw } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useToast } from "@/components/ui/toast"
 import { getAllAccountabilityPartners, autoAssignAccountabilityPartners, getTracks, getCohorts, reassignAccountabilityPartner, getStudentEnrollments } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function PartnersPage() {
   const { user, loading: authLoading } = useAuth()
@@ -23,11 +24,11 @@ export default function PartnersPage() {
 
   useEffect(() => {
     async function loadPartners() {
-      console.log('Partners useEffect triggered, user:', user?.id, 'authLoading:', authLoading)
+      logger.log('Partners useEffect triggered, user:', user?.id, 'authLoading:', authLoading)
       if (!user?.id) return
       
       try {
-        console.log('Loading partners page data...')
+        logger.log('Loading partners page data...')
         
         // Load each data source separately to avoid cascade failures
         let partnersData: any[] = []
@@ -36,29 +37,29 @@ export default function PartnersPage() {
         
         try {
           partnersData = await getAllAccountabilityPartners()
-          console.log('Partners loaded:', partnersData?.length || 0)
+          logger.log('Partners loaded:', partnersData?.length || 0)
         } catch (partnersError) {
-          console.error('Error loading partners:', partnersError)
+          logger.error('Error loading partners:', partnersError)
           partnersData = []
         }
         
         try {
           tracksData = await getTracks()
-          console.log('Tracks loaded:', tracksData?.length || 0, tracksData)
+          logger.log('Tracks loaded:', tracksData?.length || 0, tracksData)
         } catch (tracksError) {
-          console.error('Error loading tracks:', tracksError)
+          logger.error('Error loading tracks:', tracksError)
           tracksData = []
         }
         
         try {
           cohortsData = await getCohorts()
-          console.log('Cohorts loaded:', cohortsData?.length || 0, cohortsData)
+          logger.log('Cohorts loaded:', cohortsData?.length || 0, cohortsData)
         } catch (cohortsError) {
-          console.error('Error loading cohorts:', cohortsError)
+          logger.error('Error loading cohorts:', cohortsError)
           cohortsData = []
         }
         
-        console.log('Partners page loaded data:', {
+        logger.log('Partners page loaded data:', {
           partners: partnersData?.length || 0,
           tracks: tracksData?.length || 0,
           cohorts: cohortsData?.length || 0
@@ -78,13 +79,13 @@ export default function PartnersPage() {
         setTracks(tracksData || [])
         setCohorts(cohortsData || [])
         
-        console.log('Partners page final state set:', {
+        logger.log('Partners page final state set:', {
           partnersCount: transformedPartners.length,
           tracksCount: (tracksData || []).length,
           cohortsCount: (cohortsData || []).length
         })
       } catch (error) {
-        console.error('Error in loadPartners function:', error)
+        logger.error('Error in loadPartners function:', error)
         setPartners([])
         setTracks([])
         setCohorts([])
@@ -113,7 +114,7 @@ export default function PartnersPage() {
       setSelectedPartnership(partnership)
       setShowReassignModal(true)
     } catch (error: any) {
-      console.error('Error loading students for reassignment:', error)
+      logger.error('Error loading students for reassignment:', error)
       showToast({
         type: 'error',
         title: 'Loading Failed',
@@ -149,7 +150,7 @@ export default function PartnersPage() {
         message: 'The accountability partnership has been successfully reassigned.'
       })
     } catch (error: any) {
-      console.error('Error reassigning partner:', error)
+      logger.error('Error reassigning partner:', error)
       showToast({
         type: 'error',
         title: 'Reassignment Failed',
@@ -170,7 +171,7 @@ export default function PartnersPage() {
 
     setAutopairing(true)
     try {
-      console.log('Starting auto-pairing for:', { selectedTrack, selectedCohort })
+      logger.log('Starting auto-pairing for:', { selectedTrack, selectedCohort })
       
       // Add a timeout to prevent hanging
       const timeoutPromise = new Promise<never>((_, reject) => 
@@ -211,7 +212,7 @@ export default function PartnersPage() {
       setSelectedTrack("")
       setSelectedCohort("")
     } catch (error: any) {
-      console.error('Error with auto-pairing:', error)
+      logger.error('Error with auto-pairing:', error)
       showToast({
         type: 'error',
         title: 'Auto-Pairing Failed',

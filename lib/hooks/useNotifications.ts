@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
+import { logger } from "@/lib/logger"
 
 export interface Notification {
   id: string
@@ -71,7 +72,7 @@ export function useNotifications(userId: string) {
 
       if (error) {
         // If table doesn't exist or other database error, just log and continue
-        console.warn('Notifications table not available:', error.message)
+        logger.warn('Notifications table not available:', error.message)
         setNotifications([])
         setUnreadCount(0)
         return
@@ -80,7 +81,7 @@ export function useNotifications(userId: string) {
       setNotifications(data || [])
       setUnreadCount(data?.filter(n => !n.read).length || 0)
     } catch (error) {
-      console.warn('Error loading notifications:', error)
+      logger.warn('Error loading notifications:', error)
       // Set empty state instead of failing
       setNotifications([])
       setUnreadCount(0)
@@ -97,7 +98,7 @@ export function useNotifications(userId: string) {
         .eq('id', notificationId)
 
       if (error) {
-        console.warn('Error marking notification as read:', error.message)
+        logger.warn('Error marking notification as read:', error.message)
         return
       }
 
@@ -106,7 +107,7 @@ export function useNotifications(userId: string) {
       )
       setUnreadCount(prev => Math.max(0, prev - 1))
     } catch (error) {
-      console.warn('Error marking notification as read:', error)
+      logger.warn('Error marking notification as read:', error)
     }
   }
 
@@ -119,14 +120,14 @@ export function useNotifications(userId: string) {
         .eq('read', false)
 
       if (error) {
-        console.warn('Error marking all notifications as read:', error.message)
+        logger.warn('Error marking all notifications as read:', error.message)
         return
       }
 
       setNotifications(prev => prev.map(n => ({ ...n, read: true })))
       setUnreadCount(0)
     } catch (error) {
-      console.warn('Error marking all notifications as read:', error)
+      logger.warn('Error marking all notifications as read:', error)
     }
   }
 
@@ -168,7 +169,7 @@ export async function createNotification(
     })
 
   if (error) {
-    console.error('Error creating notification:', error)
+    logger.error('Error creating notification:', error)
     throw error
   }
 }

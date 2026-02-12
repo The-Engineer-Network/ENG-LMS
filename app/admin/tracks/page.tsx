@@ -5,6 +5,7 @@ import { Plus, Edit2, Trash2, ChevronDown, X, Upload } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { getTracks, getStudentEnrollments, getAllAssignments, getAllWeeks, createAssignment, createTrack, updateTrack, deleteTrack, updateAssignment, deleteAssignment, getWeeksByTrack } from "@/lib/data"
 import { useToast } from "@/components/ui/toast"
+import { logger } from "@/lib/logger"
 
 function AddTaskModal({
   isOpen,
@@ -244,11 +245,11 @@ export default function TracksPage() {
       if (!user?.id) return
       
       try {
-        console.log('loadTracks: Starting to load data...')
+        logger.log('loadTracks: Starting to load data...')
         
         // Load tracks first (this works)
         const tracksData = await getTracks()
-        console.log('loadTracks: Tracks loaded:', tracksData.length)
+        logger.log('loadTracks: Tracks loaded:', tracksData.length)
         
         // Try to load other data, but handle failures gracefully
         let enrollmentsData: any[] = []
@@ -257,18 +258,18 @@ export default function TracksPage() {
         
         try {
           enrollmentsData = await getStudentEnrollments()
-          console.log('loadTracks: Enrollments loaded:', enrollmentsData.length)
+          logger.log('loadTracks: Enrollments loaded:', enrollmentsData.length)
         } catch (err) {
-          console.warn('Failed to load enrollments (RLS issue):', err)
+          logger.warn('Failed to load enrollments (RLS issue):', err)
           enrollmentsData = []
         }
         
         try {
           assignmentsData = await getAllAssignments()
-          console.log('loadTracks: Assignments loaded:', assignmentsData.length)
+          logger.log('loadTracks: Assignments loaded:', assignmentsData.length)
         } catch (err) {
-          console.warn('Failed to load assignments (RLS issue):', err)
-          console.warn('Trying alternative approach for assignments...')
+          logger.warn('Failed to load assignments (RLS issue):', err)
+          logger.warn('Trying alternative approach for assignments...')
           
           // Try alternative approach - get assignments for each track individually
           try {
@@ -285,22 +286,22 @@ export default function TracksPage() {
                   }
                 }
               } catch (trackErr) {
-                console.warn(`Failed to get assignments for track ${track.id}:`, trackErr)
+                logger.warn(`Failed to get assignments for track ${track.id}:`, trackErr)
               }
             }
             assignmentsData = allAssignments
-            console.log('loadTracks: Assignments loaded via alternative method:', assignmentsData.length)
+            logger.log('loadTracks: Assignments loaded via alternative method:', assignmentsData.length)
           } catch (altErr) {
-            console.warn('Alternative assignment loading also failed:', altErr)
+            logger.warn('Alternative assignment loading also failed:', altErr)
             assignmentsData = []
           }
         }
         
         try {
           weeksData = await getAllWeeks()
-          console.log('loadTracks: Weeks loaded:', weeksData.length)
+          logger.log('loadTracks: Weeks loaded:', weeksData.length)
         } catch (err) {
-          console.warn('Failed to load weeks (RLS issue):', err)
+          logger.warn('Failed to load weeks (RLS issue):', err)
           // Try alternative approach for weeks
           try {
             const allWeeks: any[] = []
@@ -309,13 +310,13 @@ export default function TracksPage() {
                 const trackWeeks = await getWeeksByTrack(track.id)
                 allWeeks.push(...trackWeeks)
               } catch (trackErr) {
-                console.warn(`Failed to get weeks for track ${track.id}:`, trackErr)
+                logger.warn(`Failed to get weeks for track ${track.id}:`, trackErr)
               }
             }
             weeksData = allWeeks
-            console.log('loadTracks: Weeks loaded via alternative method:', weeksData.length)
+            logger.log('loadTracks: Weeks loaded via alternative method:', weeksData.length)
           } catch (altErr) {
-            console.warn('Alternative weeks loading also failed:', altErr)
+            logger.warn('Alternative weeks loading also failed:', altErr)
             weeksData = []
           }
         }
@@ -330,7 +331,7 @@ export default function TracksPage() {
           const completedSubmissions = Math.floor(totalSubmissions * 0.75) // Placeholder calculation
           const completionRate = totalSubmissions > 0 ? Math.round((completedSubmissions / totalSubmissions) * 100) : 0
           
-          console.log(`Track ${track.name}: ${trackAssignments.length} assignments found`)
+          logger.log(`Track ${track.name}: ${trackAssignments.length} assignments found`)
           
           return {
             id: track.id,
@@ -356,12 +357,12 @@ export default function TracksPage() {
           track_id: assignment.week?.track_id
         })))
         
-        console.log('loadTracks: All data processed successfully')
-        console.log('loadTracks: Final tracks with task counts:', transformedTracks.map(t => ({ name: t.name, tasks: t.tasks })))
+        logger.log('loadTracks: All data processed successfully')
+        logger.log('loadTracks: Final tracks with task counts:', transformedTracks.map(t => ({ name: t.name, tasks: t.tasks })))
       } catch (error: any) {
-        console.error('Error loading tracks:', error)
+        logger.error('Error loading tracks:', error)
         if (error.message?.includes('permission denied') || error.code === '42501') {
-          console.warn('Admin access denied - check user permissions')
+          logger.warn('Admin access denied - check user permissions')
         }
         setTracks([])
         setTasks([])
@@ -380,7 +381,7 @@ export default function TracksPage() {
     if (!user?.id) return
     
     try {
-      console.log('Refreshing data...')
+      logger.log('Refreshing data...')
       const tracksData = await getTracks()
       
       // Try to get assignments using multiple approaches
@@ -388,9 +389,9 @@ export default function TracksPage() {
       
       try {
         assignmentsData = await getAllAssignments()
-        console.log('Refresh: Assignments loaded via getAllAssignments:', assignmentsData.length)
+        logger.log('Refresh: Assignments loaded via getAllAssignments:', assignmentsData.length)
       } catch (err) {
-        console.warn('Refresh: getAllAssignments failed, trying alternative approach:', err)
+        logger.warn('Refresh: getAllAssignments failed, trying alternative approach:', err)
         
         // Alternative approach - get assignments for each track individually
         try {
@@ -407,17 +408,17 @@ export default function TracksPage() {
                 }
               }
             } catch (trackErr) {
-              console.warn(`Refresh: Failed to get assignments for track ${track.id}:`, trackErr)
+              logger.warn(`Refresh: Failed to get assignments for track ${track.id}:`, trackErr)
             }
           }
           assignmentsData = allAssignments
-          console.log('Refresh: Assignments loaded via alternative method:', assignmentsData.length)
+          logger.log('Refresh: Assignments loaded via alternative method:', assignmentsData.length)
         } catch (altErr) {
-          console.warn('Refresh: Alternative assignment loading also failed:', altErr)
+          logger.warn('Refresh: Alternative assignment loading also failed:', altErr)
           
           // Last resort - try direct query
           try {
-            console.log('Refresh: Trying direct Supabase query...')
+            logger.log('Refresh: Trying direct Supabase query...')
             const { createClient } = await import('@supabase/supabase-js')
             const supabase = createClient(
               process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -437,12 +438,12 @@ export default function TracksPage() {
             
             if (!error && directAssignments) {
               assignmentsData = directAssignments
-              console.log('Refresh: Assignments loaded via direct query:', assignmentsData.length)
+              logger.log('Refresh: Assignments loaded via direct query:', assignmentsData.length)
             } else {
-              console.warn('Refresh: Direct query failed:', error)
+              logger.warn('Refresh: Direct query failed:', error)
             }
           } catch (directErr) {
-            console.warn('Refresh: Direct query approach failed:', directErr)
+            logger.warn('Refresh: Direct query approach failed:', directErr)
             assignmentsData = []
           }
         }
@@ -453,7 +454,7 @@ export default function TracksPage() {
         const trackAssignments = assignmentsData.filter((a: any) => a.week?.track_id === track.id)
         const existingTrack = tracks.find(t => t.id === track.id)
         
-        console.log(`Refresh: Track ${track.name} has ${trackAssignments.length} assignments`)
+        logger.log(`Refresh: Track ${track.name} has ${trackAssignments.length} assignments`)
         
         return {
           id: track.id,
@@ -480,21 +481,21 @@ export default function TracksPage() {
       
       setTasks(updatedTasks)
       
-      console.log('Refresh: Updated tasks:', updatedTasks)
-      console.log('Refresh: Tasks per track:', tracksData.map(t => ({
+      logger.log('Refresh: Updated tasks:', updatedTasks)
+      logger.log('Refresh: Tasks per track:', tracksData.map(t => ({
         track: t.name,
         tasks: updatedTasks.filter(task => task.track_id === t.id).length
       })))
       
       // Also log the specific task that was updated
       if (updatedTasks.length > 0) {
-        console.log('Refresh: Sample task data:', updatedTasks[0])
+        logger.log('Refresh: Sample task data:', updatedTasks[0])
       }
       
-      console.log('Refresh: Data refreshed successfully')
-      console.log('Refresh: Updated tracks with task counts:', transformedTracks.map(t => ({ name: t.name, tasks: t.tasks })))
+      logger.log('Refresh: Data refreshed successfully')
+      logger.log('Refresh: Updated tracks with task counts:', transformedTracks.map(t => ({ name: t.name, tasks: t.tasks })))
     } catch (error) {
-      console.error('Error refreshing data:', error)
+      logger.error('Error refreshing data:', error)
     }
   }
 
@@ -504,15 +505,15 @@ export default function TracksPage() {
     try {
       if (editingTask) {
         // Update existing task
-        console.log('Updating existing task:', editingTask.id)
-        console.log('Update data:', {
+        logger.log('Updating existing task:', editingTask.id)
+        logger.log('Update data:', {
           title: newTask.title,
           requirements: newTask.requirements,
           submission_guidelines: newTask.guidelines
         })
         
         try {
-          console.log('Starting updateAssignment call...')
+          logger.log('Starting updateAssignment call...')
           
           // Add timeout to prevent hanging
           const updatePromise = updateAssignment(editingTask.id, {
@@ -529,7 +530,7 @@ export default function TracksPage() {
           
           const updatedAssignment = await Promise.race([updatePromise, timeoutPromise])
           
-          console.log('Assignment updated successfully:', updatedAssignment)
+          logger.log('Assignment updated successfully:', updatedAssignment)
           
           showToast({
             type: 'success',
@@ -537,11 +538,11 @@ export default function TracksPage() {
             message: `"${newTask.title}" has been successfully updated.`
           })
         } catch (updateError) {
-          console.error('Update assignment failed:', updateError)
+          logger.error('Update assignment failed:', updateError)
           
           // Try alternative direct update approach
           try {
-            console.log('Trying direct Supabase update...')
+            logger.log('Trying direct Supabase update...')
             
             // Use the existing supabase client from data.ts instead of creating new one
             const { supabase } = await import('@/lib/supabase')
@@ -560,18 +561,18 @@ export default function TracksPage() {
               .single()
             
             if (directError) {
-              console.error('Direct update also failed:', directError)
+              logger.error('Direct update also failed:', directError)
               throw directError
             }
             
-            console.log('Direct update succeeded:', directUpdate)
+            logger.log('Direct update succeeded:', directUpdate)
             showToast({
               type: 'success',
               title: 'Task Updated',
               message: `"${newTask.title}" has been successfully updated.`
             })
           } catch (directUpdateError) {
-            console.error('Both update methods failed:', directUpdateError)
+            logger.error('Both update methods failed:', directUpdateError)
             
             // Show error toast
             showToast({
@@ -585,7 +586,7 @@ export default function TracksPage() {
         }
       } else {
         // Create new task
-        console.log('Attempting to create assignment for track:', expandedTrack)
+        logger.log('Attempting to create assignment for track:', expandedTrack)
         
         // First, try to get weeks for this track using the simpler function
         let weekId = null
@@ -595,10 +596,10 @@ export default function TracksPage() {
           
           if (trackWeeks && trackWeeks.length > 0) {
             weekId = trackWeeks[0].id
-            console.log('Found week for assignment:', weekId)
+            logger.log('Found week for assignment:', weekId)
           }
         } catch (err) {
-          console.warn('Could not fetch weeks:', err)
+          logger.warn('Could not fetch weeks:', err)
         }
         
         // If no week found, show toast error
@@ -611,7 +612,7 @@ export default function TracksPage() {
           return
         }
         
-        console.log('Creating assignment for week:', weekId)
+        logger.log('Creating assignment for week:', weekId)
         await createAssignment({
           title: newTask.title,
           requirements: newTask.requirements,
@@ -629,17 +630,17 @@ export default function TracksPage() {
       }
       
       // Refresh data to update counts
-      console.log('Refreshing data after task save...')
+      logger.log('Refreshing data after task save...')
       await refreshData()
-      console.log('Data refresh completed')
+      logger.log('Data refresh completed')
       
       // Force a small delay to ensure data is updated
       setTimeout(() => {
-        console.log('Final check - current tasks:', tasks.length)
+        logger.log('Final check - current tasks:', tasks.length)
       }, 1000)
       
     } catch (error) {
-      console.error('Error saving task:', error)
+      logger.error('Error saving task:', error)
       
       // Check if it's a foreign key constraint error (no week exists)
       if ((error as any)?.message?.includes('foreign key') || (error as any)?.message?.includes('week_id')) {
@@ -659,7 +660,7 @@ export default function TracksPage() {
   }
 
   const handleEditTask = (task: any) => {
-    console.log('Editing task:', task)
+    logger.log('Editing task:', task)
     setEditingTask(task)
     setShowAddTaskModal(true)
   }
@@ -678,7 +679,7 @@ export default function TracksPage() {
           message: 'The task has been successfully deleted.'
         })
       } catch (error) {
-        console.error('Error deleting task:', error)
+        logger.error('Error deleting task:', error)
         showToast({
           type: 'error',
           title: 'Failed to Delete Task',
@@ -690,7 +691,7 @@ export default function TracksPage() {
 
   const handleCreateTrack = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Creating track with data:', { name: newTrackForm.name, description: newTrackForm.description })
+    logger.log('Creating track with data:', { name: newTrackForm.name, description: newTrackForm.description })
     
     if (!newTrackForm.name.trim()) {
       showToast({
@@ -702,13 +703,13 @@ export default function TracksPage() {
     }
     
     try {
-      console.log('Calling createTrack function...')
+      logger.log('Calling createTrack function...')
       const newTrack = await createTrack({
         name: newTrackForm.name,
         description: newTrackForm.description
       })
       
-      console.log('Track created successfully:', newTrack)
+      logger.log('Track created successfully:', newTrack)
       
       // Add to local state
       setTracks(prev => [...prev, {
@@ -728,8 +729,8 @@ export default function TracksPage() {
         message: `"${newTrack.name}" has been successfully created.`
       })
     } catch (error: any) {
-      console.error('Error creating track:', error)
-      console.error('Error details:', {
+      logger.error('Error creating track:', error)
+      logger.error('Error details:', {
         message: error.message,
         code: error.code,
         details: error.details,
@@ -762,7 +763,7 @@ export default function TracksPage() {
 
   const handleUpdateTrack = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Updating track with data:', { id: editingTrack.id, name: editTrackForm.name, description: editTrackForm.description })
+    logger.log('Updating track with data:', { id: editingTrack.id, name: editTrackForm.name, description: editTrackForm.description })
     
     if (!editTrackForm.name.trim()) {
       showToast({
@@ -774,13 +775,13 @@ export default function TracksPage() {
     }
     
     try {
-      console.log('Calling updateTrack function...')
+      logger.log('Calling updateTrack function...')
       const updatedTrack = await updateTrack(editingTrack.id, {
         name: editTrackForm.name,
         description: editTrackForm.description
       })
       
-      console.log('Track updated successfully:', updatedTrack)
+      logger.log('Track updated successfully:', updatedTrack)
       
       // Update local state
       setTracks(prev => prev.map(track => 
@@ -797,8 +798,8 @@ export default function TracksPage() {
         message: `"${updatedTrack.name}" has been successfully updated.`
       })
     } catch (error: any) {
-      console.error('Error updating track:', error)
-      console.error('Error details:', {
+      logger.error('Error updating track:', error)
+      logger.error('Error details:', {
         message: error.message,
         code: error.code,
         details: error.details,
@@ -826,13 +827,13 @@ export default function TracksPage() {
       return
     }
     
-    console.log('Deleting track:', track.id)
+    logger.log('Deleting track:', track.id)
     
     try {
-      console.log('Calling deleteTrack function...')
+      logger.log('Calling deleteTrack function...')
       await deleteTrack(track.id)
       
-      console.log('Track deleted successfully')
+      logger.log('Track deleted successfully')
       
       // Remove from local state
       setTracks(prev => prev.filter(t => t.id !== track.id))
@@ -843,8 +844,8 @@ export default function TracksPage() {
         message: `"${track.name}" has been successfully deleted.`
       })
     } catch (error: any) {
-      console.error('Error deleting track:', error)
-      console.error('Error details:', {
+      logger.error('Error deleting track:', error)
+      logger.error('Error details:', {
         message: error.message,
         code: error.code,
         details: error.details,

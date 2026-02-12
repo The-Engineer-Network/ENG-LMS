@@ -39,7 +39,6 @@ export default function CohortsPage() {
         
         setCohorts(transformedCohorts)
       } catch (error) {
-        console.error('Error loading cohorts:', error)
         setCohorts([])
       } finally {
         setLoading(false)
@@ -97,7 +96,6 @@ export default function CohortsPage() {
         setEditingCohort(null)
         setShowForm(false)
       } catch (error) {
-        console.error('Error saving cohort:', error)
         alert('Failed to save cohort')
       }
     }
@@ -119,7 +117,6 @@ export default function CohortsPage() {
         await deleteCohort(cohortId)
         setCohorts(prev => prev.filter(c => c.id !== cohortId))
       } catch (error) {
-        console.error('Error deleting cohort:', error)
         alert('Failed to delete cohort')
       }
     }

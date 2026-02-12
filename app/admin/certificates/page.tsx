@@ -5,6 +5,7 @@ import { CheckCircle2, Lock, Download, Upload, Trash2 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useToast } from "@/components/ui/toast"
 import { getAllCertificates, uploadCertificateFile, deleteCertificate } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function CertificatesPage() {
   const { user, loading: authLoading } = useAuth()
@@ -38,7 +39,7 @@ export default function CertificatesPage() {
         
         setCertificates(transformedCertificates)
       } catch (error) {
-        console.error('Error loading certificates:', error)
+        logger.error('Error loading certificates:', error)
         setCertificates([])
       } finally {
         setLoading(false)
@@ -76,7 +77,7 @@ export default function CertificatesPage() {
         message: 'The certificate has been successfully deleted.'
       })
     } catch (error: any) {
-      console.error('Error deleting certificate:', error)
+      logger.error('Error deleting certificate:', error)
       showToast({
         type: 'error',
         title: 'Delete Failed',
@@ -110,7 +111,7 @@ export default function CertificatesPage() {
       setShowUploadModal(false)
       setSelectedStudent(null)
     } catch (error) {
-      console.error('Error uploading certificate:', error)
+      logger.error('Error uploading certificate:', error)
       alert('Failed to upload certificate')
     }
   }

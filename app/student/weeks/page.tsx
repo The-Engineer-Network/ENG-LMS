@@ -5,6 +5,7 @@ import Link from "next/link"
 import { CheckCircle2, Lock, Clock, Play, FileText } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { getStudentEnrollment, getWeeksByTrack, getStudentWeekProgress } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function WeeksPage() {
   const { user, loading: authLoading } = useAuth()
@@ -17,20 +18,20 @@ export default function WeeksPage() {
       if (!user?.id) return
       
       try {
-        console.log('Loading weeks data for student:', user.id)
+        logger.log('Loading weeks data for student:', user.id)
         const enrollmentData = await getStudentEnrollment(user.id)
         if (!enrollmentData) {
-          console.log('No enrollment found for student')
+          logger.log('No enrollment found for student')
           return
         }
         
-        console.log('Enrollment data:', enrollmentData)
+        logger.log('Enrollment data:', enrollmentData)
         setEnrollment(enrollmentData)
         
-        console.log('Fetching weeks for track:', enrollmentData.track_id)
+        logger.log('Fetching weeks for track:', enrollmentData.track_id)
         const weeksData = await getWeeksByTrack(enrollmentData.track_id)
-        console.log('Weeks data received:', weeksData)
-        console.log('Lessons in weeks:', weeksData.map(w => ({ week: w.title, lessons: w.lessons?.length || 0 })))
+        logger.log('Weeks data received:', weeksData)
+        logger.log('Lessons in weeks:', weeksData.map(w => ({ week: w.title, lessons: w.lessons?.length || 0 })))
         
         const progressData = await getStudentWeekProgress(user.id)
         
@@ -70,7 +71,7 @@ export default function WeeksPage() {
         
         setWeeks(mockWeeks)
       } catch (error) {
-        console.error('Error loading weeks data:', error)
+        logger.error('Error loading weeks data:', error)
         setWeeks([])
       } finally {
         setLoading(false)

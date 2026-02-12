@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Plus, X, Play } from "lucide-react"
+import { logger } from "@/lib/logger"
 
 interface Video {
   url: string
@@ -23,15 +24,15 @@ export function MultiVideoInput({ videos, onChange, maxVideos = 5, label = "Vide
   const handleAddVideo = () => {
     if (newVideo.url.trim() && newVideo.title.trim() && videos.length < maxVideos) {
       const updatedVideos = [...videos, { ...newVideo, url: newVideo.url.trim(), title: newVideo.title.trim() }]
-      console.log('=== MultiVideoInput: Adding video ===')
-      console.log('Current videos:', videos)
-      console.log('New video:', newVideo)
-      console.log('Updated videos array:', updatedVideos)
+      logger.log('=== MultiVideoInput: Adding video ===')
+      logger.log('Current videos:', videos)
+      logger.log('New video:', newVideo)
+      logger.log('Updated videos array:', updatedVideos)
       onChange(updatedVideos)
       setNewVideo({ url: "", title: "", duration: "" })
     } else {
-      console.log('=== MultiVideoInput: Cannot add video ===')
-      console.log('Reason:', {
+      logger.log('=== MultiVideoInput: Cannot add video ===')
+      logger.log('Reason:', {
         hasUrl: !!newVideo.url.trim(),
         hasTitle: !!newVideo.title.trim(),
         underLimit: videos.length < maxVideos,
@@ -43,10 +44,10 @@ export function MultiVideoInput({ videos, onChange, maxVideos = 5, label = "Vide
 
   const handleRemoveVideo = (index: number) => {
     const updatedVideos = videos.filter((_, i) => i !== index)
-    console.log('=== MultiVideoInput: Removing video ===')
-    console.log('Removing index:', index)
-    console.log('Current videos:', videos)
-    console.log('Updated videos array:', updatedVideos)
+    logger.log('=== MultiVideoInput: Removing video ===')
+    logger.log('Removing index:', index)
+    logger.log('Current videos:', videos)
+    logger.log('Updated videos array:', updatedVideos)
     onChange(updatedVideos)
   }
 

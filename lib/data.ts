@@ -1,5 +1,6 @@
 import { supabase } from './supabase-fixed'
 import { dataCache, CACHE_KEYS, CACHE_TTL } from './cache'
+import { logger } from './logger'
 import type { 
   Track, 
   Cohort, 
@@ -18,12 +19,9 @@ import type {
 
 // Tracks
 export async function getTracks(): Promise<Track[]> {
-  console.log('getTracks: Starting function call')
-  
   // Check cache first
   const cached = dataCache.get<Track[]>(CACHE_KEYS.TRACKS)
   if (cached) {
-    console.log('getTracks: Returning cached data')
     return cached
   }
   
@@ -40,28 +38,25 @@ export async function getTracks(): Promise<Track[]> {
     })
 
     const data = await response.json()
-    console.log('getTracks: HTTP response:', { dataLength: data?.length })
+    logger.log('getTracks: HTTP response:', { dataLength: data?.length })
 
     const tracks = data || []
     // Cache for 5 minutes
     dataCache.set(CACHE_KEYS.TRACKS, tracks, CACHE_TTL.LONG)
     
-    console.log('getTracks: Returning data:', tracks)
+    logger.log('getTracks: Returning data:', tracks)
     return tracks
   } catch (err) {
-    console.error('getTracks: Caught exception:', err)
+    logger.error('getTracks: Caught exception:', err)
     throw err
   }
 }
 
 // Cohorts
 export async function getCohorts(): Promise<Cohort[]> {
-  console.log('getCohorts: Starting function call')
-  
   // Check cache first
   const cached = dataCache.get<Cohort[]>(CACHE_KEYS.COHORTS)
   if (cached) {
-    console.log('getCohorts: Returning cached data')
     return cached
   }
   
@@ -78,24 +73,22 @@ export async function getCohorts(): Promise<Cohort[]> {
     })
 
     const data = await response.json()
-    console.log('getCohorts: HTTP response:', { dataLength: data?.length })
+    logger.log('getCohorts: HTTP response:', { dataLength: data?.length })
 
     const cohorts = data || []
     // Cache for 5 minutes
     dataCache.set(CACHE_KEYS.COHORTS, cohorts, CACHE_TTL.LONG)
     
-    console.log('getCohorts: Returning data:', cohorts)
+    logger.log('getCohorts: Returning data:', cohorts)
     return cohorts
   } catch (err) {
-    console.error('getCohorts: Caught exception:', err)
+    logger.error('getCohorts: Caught exception:', err)
     throw err
   }
 }
 
 // Weeks and Lessons
 export async function getWeeksByTrack(trackId: string): Promise<Week[]> {
-  console.log('getWeeksByTrack called for trackId:', trackId)
-  
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -112,7 +105,6 @@ export async function getWeeksByTrack(trackId: string): Promise<Week[]> {
     const weeks = await weeksRes.json()
     
     if (!weeks || weeks.length === 0) {
-      console.log('No weeks found for track:', trackId)
       return []
     }
 
@@ -137,7 +129,6 @@ export async function getWeeksByTrack(trackId: string): Promise<Week[]> {
       const lessonsData = await lessonsRes.json()
       allLessons = Array.isArray(lessonsData) ? lessonsData : []
     } catch (e) {
-      console.error('Error parsing lessons:', e)
       allLessons = []
     }
     
@@ -145,7 +136,6 @@ export async function getWeeksByTrack(trackId: string): Promise<Week[]> {
       const assignmentsData = await assignmentsRes.json()
       allAssignments = Array.isArray(assignmentsData) ? assignmentsData : []
     } catch (e) {
-      console.error('Error parsing assignments:', e)
       allAssignments = []
     }
 
@@ -174,7 +164,7 @@ export async function getWeeksByTrack(trackId: string): Promise<Week[]> {
       assignments: assignmentsByWeek.get(week.id) || []
     }))
 
-    console.log('getWeeksByTrack result:', { 
+    logger.log('getWeeksByTrack result:', { 
       weeksCount: weeksWithData.length, 
       lessonsCount: allLessons.length,
       assignmentsCount: allAssignments.length
@@ -182,7 +172,7 @@ export async function getWeeksByTrack(trackId: string): Promise<Week[]> {
 
     return weeksWithData
   } catch (err) {
-    console.error('getWeeksByTrack exception:', err)
+    logger.error('getWeeksByTrack exception:', err)
     throw err
   }
 }
@@ -247,7 +237,7 @@ export async function getAllAssignments() {
 
 // Get assignments for a specific student based on their enrollment
 export async function getStudentAssignments(studentId: string) {
-  console.log('getStudentAssignments called for studentId:', studentId)
+  logger.log('getStudentAssignments called for studentId:', studentId)
   
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -269,18 +259,15 @@ export async function getStudentAssignments(studentId: string) {
     )
     
     if (!enrollmentResponse.ok) {
-      console.error('Failed to fetch enrollment')
       return []
     }
     
     const enrollments = await enrollmentResponse.json()
     if (!enrollments || enrollments.length === 0) {
-      console.log('No enrollment found for student')
       return []
     }
     
     const trackId = enrollments[0].track_id
-    console.log('Student track_id:', trackId)
     
     // Get all weeks for this track
     const weeksResponse = await fetch(
@@ -294,16 +281,13 @@ export async function getStudentAssignments(studentId: string) {
     )
     
     if (!weeksResponse.ok) {
-      console.error('Failed to fetch weeks')
       return []
     }
     
     const weeks = await weeksResponse.json()
     const weekIds = weeks.map((w: any) => w.id)
-    console.log('Week IDs for track:', weekIds)
     
     if (weekIds.length === 0) {
-      console.log('No weeks found for track')
       return []
     }
     
@@ -319,12 +303,10 @@ export async function getStudentAssignments(studentId: string) {
     )
     
     if (!assignmentsResponse.ok) {
-      console.error('Failed to fetch assignments')
       return []
     }
     
     const assignments = await assignmentsResponse.json()
-    console.log('Found assignments:', assignments.length)
     
     // Get student's submissions to mark which assignments are submitted
     const submissionsResponse = await fetch(
@@ -351,22 +333,19 @@ export async function getStudentAssignments(studentId: string) {
       }
     })
     
-    console.log('Assignments with status:', assignmentsWithStatus.length)
     return assignmentsWithStatus
   } catch (err: any) {
-    console.error('Error in getStudentAssignments:', err)
     return []
   }
 }
 
 // Student Enrollments
 export async function getStudentEnrollments(): Promise<StudentEnrollment[]> {
-  console.log('getStudentEnrollments called')
   
   // Check cache first
   const cached = dataCache.get<StudentEnrollment[]>(CACHE_KEYS.STUDENTS)
   if (cached) {
-    console.log('Returning cached student enrollments')
+    logger.log('Returning cached student enrollments')
     return cached
   }
 
@@ -415,16 +394,16 @@ export async function getStudentEnrollments(): Promise<StudentEnrollment[]> {
     // Cache for 2 minutes
     dataCache.set(CACHE_KEYS.STUDENTS, enrichedEnrollments, CACHE_TTL.MEDIUM)
     
-    console.log(`Loaded ${enrichedEnrollments.length} student enrollments`)
+    logger.log(`Loaded ${enrichedEnrollments.length} student enrollments`)
     return enrichedEnrollments
   } catch (error) {
-    console.error('Error in getStudentEnrollments:', error)
+    logger.error('Error in getStudentEnrollments:', error)
     throw error
   }
 }
 
 export async function getStudentEnrollment(userId: string): Promise<StudentEnrollment | null> {
-  console.log('getStudentEnrollment called for userId:', userId)
+  logger.log('getStudentEnrollment called for userId:', userId)
   
   try {
     // First get the enrollment
@@ -435,7 +414,7 @@ export async function getStudentEnrollment(userId: string): Promise<StudentEnrol
       .single()
 
     if (enrollmentError || !enrollment) {
-      console.error('getStudentEnrollment error:', enrollmentError)
+      logger.error('getStudentEnrollment error:', enrollmentError)
       return null
     }
 
@@ -453,22 +432,22 @@ export async function getStudentEnrollment(userId: string): Promise<StudentEnrol
       cohort: cohortResult.data
     }
 
-    console.log('getStudentEnrollment result:', result)
+    logger.log('getStudentEnrollment result:', result)
     return result
   } catch (err) {
-    console.error('getStudentEnrollment exception:', err)
+    logger.error('getStudentEnrollment exception:', err)
     return null
   }
 }
 
 // Task Submissions
 export async function getTaskSubmissions(): Promise<TaskSubmission[]> {
-  console.log('getTaskSubmissions called')
+  logger.log('getTaskSubmissions called')
   
   // Check cache first
   const cached = dataCache.get<TaskSubmission[]>(CACHE_KEYS.SUBMISSIONS)
   if (cached) {
-    console.log('Returning cached submissions')
+    logger.log('Returning cached submissions')
     return cached
   }
 
@@ -492,12 +471,12 @@ export async function getTaskSubmissions(): Promise<TaskSubmission[]> {
     )
     
     if (!response.ok) {
-      console.error('Failed to fetch submissions:', response.status)
+      logger.error('Failed to fetch submissions:', response.status)
       return []
     }
     
     const submissions = await response.json()
-    console.log('Fetched submissions:', submissions.length)
+    logger.log('Fetched submissions:', submissions.length)
     
     if (submissions.length === 0) {
       return []
@@ -582,14 +561,14 @@ export async function getTaskSubmissions(): Promise<TaskSubmission[]> {
       assignment: assignmentMap.get(sub.assignment_id)
     }))
     
-    console.log('Enriched submissions:', enrichedSubmissions.length)
+    logger.log('Enriched submissions:', enrichedSubmissions.length)
     
     // Cache for 30 seconds (frequently changing)
     dataCache.set(CACHE_KEYS.SUBMISSIONS, enrichedSubmissions, CACHE_TTL.SHORT)
     
     return enrichedSubmissions
   } catch (err: any) {
-    console.error('Error in getTaskSubmissions:', err)
+    logger.error('Error in getTaskSubmissions:', err)
     return []
   }
 }
@@ -789,7 +768,7 @@ export async function checkWhitelistStatus(email: string, trackId: string, cohor
 
 // Dashboard Data
 export async function getAdminDashboardData() {
-  console.log('getAdminDashboardData called')
+  logger.log('getAdminDashboardData called')
   
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -872,13 +851,13 @@ export async function getAdminDashboardData() {
       trackMetrics: formattedTrackMetrics
     }
   } catch (error) {
-    console.error('Error in getAdminDashboardData:', error)
+    logger.error('Error in getAdminDashboardData:', error)
     throw error
   }
 }
 
 export async function getStudentDashboardData(userId: string) {
-  console.log('getStudentDashboardData called for userId:', userId)
+  logger.log('getStudentDashboardData called for userId:', userId)
   
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -900,7 +879,7 @@ export async function getStudentDashboardData(userId: string) {
     const enrollment = Array.isArray(enrollments) && enrollments.length > 0 ? enrollments[0] : null
     
     if (!enrollment) {
-      console.log('No enrollment found for user:', userId)
+      logger.log('No enrollment found for user:', userId)
       return null
     }
 
@@ -982,7 +961,7 @@ export async function getStudentDashboardData(userId: string) {
       weeks: weeksWithStatus
     }
   } catch (error) {
-    console.error('Error in getStudentDashboardData:', error)
+    logger.error('Error in getStudentDashboardData:', error)
     throw error
   }
 }
@@ -1166,7 +1145,7 @@ export async function deleteCertificate(certificateId: string) {
         .remove([fileName])
       
       if (storageError) {
-        console.error('Error deleting certificate file:', storageError)
+        logger.error('Error deleting certificate file:', storageError)
         // Continue with database deletion even if file deletion fails
       }
     }
@@ -1240,10 +1219,10 @@ export async function createLesson(lessonData: {
   week_id: string
   order_index: number
 }) {
-  console.log('createLesson called with data:', lessonData)
+  logger.log('createLesson called with data:', lessonData)
   
   try {
-    console.log('Attempting direct insert to lessons table...')
+    logger.log('Attempting direct insert to lessons table...')
     
     // Try direct fetch to Supabase REST API as a workaround
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -1253,7 +1232,7 @@ export async function createLesson(lessonData: {
       throw new Error('Missing Supabase credentials')
     }
     
-    console.log('Using direct HTTP request...')
+    logger.log('Using direct HTTP request...')
     
     const response = await fetch(`${url}/rest/v1/lessons`, {
       method: 'POST',
@@ -1266,23 +1245,23 @@ export async function createLesson(lessonData: {
       body: JSON.stringify(lessonData)
     })
     
-    console.log('HTTP response status:', response.status)
+    logger.log('HTTP response status:', response.status)
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('HTTP request failed:', errorText)
+      logger.error('HTTP request failed:', errorText)
       throw new Error(`Failed to create lesson: ${response.status} ${errorText}`)
     }
     
     const data = await response.json()
-    console.log('Lesson created successfully via HTTP:', data)
+    logger.log('Lesson created successfully via HTTP:', data)
     
     // Invalidate weeks cache
     dataCache.invalidate(CACHE_KEYS.ALL_WEEKS)
     
     return Array.isArray(data) ? data[0] : data
   } catch (err: any) {
-    console.error('Error in createLesson:', err)
+    logger.error('Error in createLesson:', err)
     throw err
   }
 }
@@ -1307,7 +1286,7 @@ export async function updateLesson(lessonId: string, updates: {
   duration?: string
   order_index?: number
 }) {
-  console.log('updateLesson called with:', { lessonId, updates })
+  logger.log('updateLesson called with:', { lessonId, updates })
   
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -1317,7 +1296,7 @@ export async function updateLesson(lessonId: string, updates: {
       throw new Error('Missing Supabase credentials')
     }
     
-    console.log('Using direct HTTP request for update...')
+    logger.log('Using direct HTTP request for update...')
     
     const response = await fetch(`${url}/rest/v1/lessons?id=eq.${lessonId}`, {
       method: 'PATCH',
@@ -1330,23 +1309,23 @@ export async function updateLesson(lessonId: string, updates: {
       body: JSON.stringify(updates)
     })
     
-    console.log('HTTP response status:', response.status)
+    logger.log('HTTP response status:', response.status)
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('HTTP request failed:', errorText)
+      logger.error('HTTP request failed:', errorText)
       throw new Error(`Failed to update lesson: ${response.status} ${errorText}`)
     }
     
     const data = await response.json()
-    console.log('Lesson updated successfully via HTTP:', data)
+    logger.log('Lesson updated successfully via HTTP:', data)
     
     // Invalidate weeks cache
     dataCache.invalidate(CACHE_KEYS.ALL_WEEKS)
     
     return Array.isArray(data) ? data[0] : data
   } catch (err: any) {
-    console.error('Error in updateLesson:', err)
+    logger.error('Error in updateLesson:', err)
     throw err
   }
 }
@@ -1479,7 +1458,7 @@ export async function updateSubmissionReview(submissionId: string, reviewData: {
   grade?: string
   reviewed_by: string
 }) {
-  console.log('updateSubmissionReview called:', { submissionId, reviewData })
+  logger.log('updateSubmissionReview called:', { submissionId, reviewData })
   
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -1510,24 +1489,24 @@ export async function updateSubmissionReview(submissionId: string, reviewData: {
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Failed to update review:', errorText)
+      logger.error('Failed to update review:', errorText)
       throw new Error(`Failed to update review: ${response.status}`)
     }
     
     const data = await response.json()
     const submission = Array.isArray(data) ? data[0] : data
     
-    console.log('Review updated successfully:', submission)
+    logger.log('Review updated successfully:', submission)
     return submission
   } catch (err: any) {
-    console.error('Error in updateSubmissionReview:', err)
+    logger.error('Error in updateSubmissionReview:', err)
     throw err
   }
 }
 
 // Get assignment by ID
 export async function getAssignmentById(assignmentId: string) {
-  console.log('getAssignmentById called for assignmentId:', assignmentId)
+  logger.log('getAssignmentById called for assignmentId:', assignmentId)
   
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -1549,24 +1528,24 @@ export async function getAssignmentById(assignmentId: string) {
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Failed to fetch assignment:', errorText)
+      logger.error('Failed to fetch assignment:', errorText)
       throw new Error(`Failed to fetch assignment: ${response.status}`)
     }
     
     const data = await response.json()
     const assignment = Array.isArray(data) ? data[0] : data
     
-    console.log('getAssignmentById result:', assignment)
+    logger.log('getAssignmentById result:', assignment)
     return assignment
   } catch (err: any) {
-    console.error('Error in getAssignmentById:', err)
+    logger.error('Error in getAssignmentById:', err)
     throw err
   }
 }
 
 // Get lesson by ID
 export async function getLessonById(lessonId: string) {
-  console.log('getLessonById called for lessonId:', lessonId)
+  logger.log('getLessonById called for lessonId:', lessonId)
   
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -1589,14 +1568,14 @@ export async function getLessonById(lessonId: string) {
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Failed to fetch lesson:', errorText)
+      logger.error('Failed to fetch lesson:', errorText)
       throw new Error(`Failed to fetch lesson: ${response.status}`)
     }
     
     const data = await response.json()
     const lesson = Array.isArray(data) ? data[0] : data
     
-    console.log('getLessonById result:', { 
+    logger.log('getLessonById result:', { 
       lesson, 
       hasVideoUrls: !!lesson?.video_urls,
       videoUrlsCount: lesson?.video_urls?.length || 0,
@@ -1606,7 +1585,7 @@ export async function getLessonById(lessonId: string) {
     
     return lesson
   } catch (err: any) {
-    console.error('Error in getLessonById:', err)
+    logger.error('Error in getLessonById:', err)
     throw err
   }
 }
@@ -1619,7 +1598,7 @@ export async function createTaskSubmission(submissionData: {
   demo_url?: string
   notes?: string
 }) {
-  console.log('createTaskSubmission called with:', submissionData)
+  logger.log('createTaskSubmission called with:', submissionData)
   
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -1638,7 +1617,7 @@ export async function createTaskSubmission(submissionData: {
       submitted_at: new Date().toISOString()
     }
     
-    console.log('Submitting to task_submissions:', payload)
+    logger.log('Submitting to task_submissions:', payload)
     
     const response = await fetch(
       `${url}/rest/v1/task_submissions`,
@@ -1656,17 +1635,17 @@ export async function createTaskSubmission(submissionData: {
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Failed to create submission:', errorText)
+      logger.error('Failed to create submission:', errorText)
       throw new Error(`Failed to create submission: ${response.status} - ${errorText}`)
     }
     
     const data = await response.json()
     const submission = Array.isArray(data) ? data[0] : data
     
-    console.log('Submission created successfully:', submission)
+    logger.log('Submission created successfully:', submission)
     return submission
   } catch (err: any) {
-    console.error('Error in createTaskSubmission:', err)
+    logger.error('Error in createTaskSubmission:', err)
     throw err
   }
 }
@@ -1677,7 +1656,7 @@ export async function updateTaskSubmission(submissionId: string, updates: {
   demo_url?: string
   notes?: string
 }) {
-  console.log('updateTaskSubmission called with:', { submissionId, updates })
+  logger.log('updateTaskSubmission called with:', { submissionId, updates })
   
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -1712,24 +1691,24 @@ export async function updateTaskSubmission(submissionId: string, updates: {
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Failed to update submission:', errorText)
+      logger.error('Failed to update submission:', errorText)
       throw new Error(`Failed to update submission: ${response.status}`)
     }
     
     const data = await response.json()
     const submission = Array.isArray(data) ? data[0] : data
     
-    console.log('Submission updated successfully:', submission)
+    logger.log('Submission updated successfully:', submission)
     return submission
   } catch (err: any) {
-    console.error('Error in updateTaskSubmission:', err)
+    logger.error('Error in updateTaskSubmission:', err)
     throw err
   }
 }
 
 // Get student's submission for an assignment
 export async function getStudentSubmissionForAssignment(studentId: string, assignmentId: string) {
-  console.log('getStudentSubmissionForAssignment called:', { studentId, assignmentId })
+  logger.log('getStudentSubmissionForAssignment called:', { studentId, assignmentId })
   
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -1750,24 +1729,24 @@ export async function getStudentSubmissionForAssignment(studentId: string, assig
     )
     
     if (!response.ok) {
-      console.error('Failed to fetch submission')
+      logger.error('Failed to fetch submission')
       return null
     }
     
     const data = await response.json()
     const submission = Array.isArray(data) && data.length > 0 ? data[0] : null
     
-    console.log('Found existing submission:', submission)
+    logger.log('Found existing submission:', submission)
     return submission
   } catch (err: any) {
-    console.error('Error in getStudentSubmissionForAssignment:', err)
+    logger.error('Error in getStudentSubmissionForAssignment:', err)
     return null
   }
 }
 
 // Get week by ID with lessons and assignments
 export async function getWeekById(weekId: string) {
-  console.log('getWeekById called for weekId:', weekId)
+  logger.log('getWeekById called for weekId:', weekId)
   
   try {
     const { data, error } = await supabase
@@ -1781,20 +1760,20 @@ export async function getWeekById(weekId: string) {
       .eq('id', weekId)
       .single()
 
-    console.log('getWeekById result:', { 
+    logger.log('getWeekById result:', { 
       data, 
       error,
       lessonsCount: data?.lessons?.length || 0 
     })
 
     if (error) {
-      console.error('getWeekById error:', error)
+      logger.error('getWeekById error:', error)
       throw error
     }
     
     return data
   } catch (err) {
-    console.error('getWeekById exception:', err)
+    logger.error('getWeekById exception:', err)
     throw err
   }
 }
@@ -1850,7 +1829,7 @@ export async function createTrack(trackData: {
   name: string
   description: string
 }) {
-  console.log('createTrack: Starting database insert with data:', trackData)
+  logger.log('createTrack: Starting database insert with data:', trackData)
   
   try {
     const { data, error } = await supabase
@@ -1859,20 +1838,20 @@ export async function createTrack(trackData: {
       .select()
       .single()
 
-    console.log('createTrack: Supabase response:', { data, error })
+    logger.log('createTrack: Supabase response:', { data, error })
 
     if (error) {
-      console.error('createTrack: Database error:', error)
+      logger.error('createTrack: Database error:', error)
       throw error
     }
     
     // Invalidate tracks cache
     dataCache.invalidate(CACHE_KEYS.TRACKS)
     
-    console.log('createTrack: Success, returning data:', data)
+    logger.log('createTrack: Success, returning data:', data)
     return data
   } catch (err) {
-    console.error('createTrack: Caught exception:', err)
+    logger.error('createTrack: Caught exception:', err)
     throw err
   }
 }
@@ -1881,7 +1860,7 @@ export async function updateTrack(trackId: string, trackData: {
   name: string
   description: string
 }) {
-  console.log('updateTrack: Starting database update with data:', { trackId, trackData })
+  logger.log('updateTrack: Starting database update with data:', { trackId, trackData })
   
   try {
     const { data, error } = await supabase
@@ -1891,10 +1870,10 @@ export async function updateTrack(trackId: string, trackData: {
       .select()
       .single()
 
-    console.log('updateTrack: Supabase response:', { data, error })
+    logger.log('updateTrack: Supabase response:', { data, error })
 
     if (error) {
-      console.error('updateTrack: Database error:', error)
+      logger.error('updateTrack: Database error:', error)
       throw error
     }
     
@@ -1902,16 +1881,16 @@ export async function updateTrack(trackId: string, trackData: {
     dataCache.invalidate(CACHE_KEYS.TRACKS)
     dataCache.invalidatePattern(`weeks_track_${trackId}`)
     
-    console.log('updateTrack: Success, returning data:', data)
+    logger.log('updateTrack: Success, returning data:', data)
     return data
   } catch (err) {
-    console.error('updateTrack: Caught exception:', err)
+    logger.error('updateTrack: Caught exception:', err)
     throw err
   }
 }
 
 export async function deleteTrack(trackId: string) {
-  console.log('deleteTrack: Starting database delete for trackId:', trackId)
+  logger.log('deleteTrack: Starting database delete for trackId:', trackId)
   
   try {
     const { error } = await supabase
@@ -1919,10 +1898,10 @@ export async function deleteTrack(trackId: string) {
       .delete()
       .eq('id', trackId)
 
-    console.log('deleteTrack: Supabase response:', { error })
+    logger.log('deleteTrack: Supabase response:', { error })
 
     if (error) {
-      console.error('deleteTrack: Database error:', error)
+      logger.error('deleteTrack: Database error:', error)
       throw error
     }
     
@@ -1930,10 +1909,10 @@ export async function deleteTrack(trackId: string) {
     dataCache.invalidate(CACHE_KEYS.TRACKS)
     dataCache.invalidatePattern(`weeks_track_${trackId}`)
     
-    console.log('deleteTrack: Success')
+    logger.log('deleteTrack: Success')
     return true
   } catch (err) {
-    console.error('deleteTrack: Caught exception:', err)
+    logger.error('deleteTrack: Caught exception:', err)
     throw err
   }
 }
@@ -2078,7 +2057,7 @@ export async function reassignAccountabilityPartner(partnerId: string, newStuden
 // Auto-assign accountability partners
 export async function autoAssignAccountabilityPartners(trackId: string, cohortId: string) {
   try {
-    console.log('Auto-pairing for track:', trackId, 'cohort:', cohortId)
+    logger.log('Auto-pairing for track:', trackId, 'cohort:', cohortId)
     
     // Get all students in the specified track and cohort who don't have partners
     const { data: students, error: studentsError } = await supabase
@@ -2091,7 +2070,7 @@ export async function autoAssignAccountabilityPartners(trackId: string, cohortId
       .eq('cohort_id', cohortId)
     
     if (studentsError) {
-      console.error('Error fetching students:', studentsError)
+      logger.error('Error fetching students:', studentsError)
       throw new Error('Failed to fetch students for pairing')
     }
     
@@ -2107,7 +2086,7 @@ export async function autoAssignAccountabilityPartners(trackId: string, cohortId
       .eq('cohort_id', cohortId)
     
     if (partnersError) {
-      console.error('Error fetching existing partners:', partnersError)
+      logger.error('Error fetching existing partners:', partnersError)
       throw new Error('Failed to check existing partnerships')
     }
     
@@ -2152,7 +2131,7 @@ export async function autoAssignAccountabilityPartners(trackId: string, cohortId
         .single()
       
       if (pairError) {
-        console.error('Error creating pair:', pairError)
+        logger.error('Error creating pair:', pairError)
         continue // Skip this pair but continue with others
       }
       
@@ -2163,11 +2142,11 @@ export async function autoAssignAccountabilityPartners(trackId: string, cohortId
       throw new Error('Failed to create any partnerships. Please try again.')
     }
     
-    console.log(`Successfully created ${newPairs.length} new partnerships`)
+    logger.log(`Successfully created ${newPairs.length} new partnerships`)
     return newPairs
     
   } catch (error) {
-    console.error('Error in autoAssignAccountabilityPartners:', error)
+    logger.error('Error in autoAssignAccountabilityPartners:', error)
     throw error
   }
 }
@@ -2183,7 +2162,7 @@ export async function getStudentAchievements(studentId: string) {
     .order('earned_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching achievements:', error)
+    logger.error('Error fetching achievements:', error)
     // Return mock data as fallback
     return [
       { icon: "🎯", title: "First Submission", description: "Completed your first assignment", earned: true },
@@ -2237,7 +2216,7 @@ export async function uploadSubmissionFile(studentId: string, assignmentId: stri
 
 // Admin Analytics
 export async function getAdminAnalytics(dateRange: string = '30d') {
-  console.log('getAdminAnalytics called with dateRange:', dateRange)
+  logger.log('getAdminAnalytics called with dateRange:', dateRange)
   
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -2282,7 +2261,7 @@ export async function getAdminAnalytics(dateRange: string = '30d') {
       recentActions: recentActions || []
     }
   } catch (error) {
-    console.error('Error in getAdminAnalytics:', error)
+    logger.error('Error in getAdminAnalytics:', error)
     // Return default values on error
     return {
       engagementMetrics: {
@@ -2298,7 +2277,7 @@ export async function getAdminAnalytics(dateRange: string = '30d') {
 
 // Bulk Operations
 export async function bulkUpdateSubmissions(submissionIds: string[], action: string, reviewerId: string) {
-  console.log('bulkUpdateSubmissions called:', { submissionIds, action, reviewerId })
+  logger.log('bulkUpdateSubmissions called:', { submissionIds, action, reviewerId })
   
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -2342,7 +2321,7 @@ export async function bulkUpdateSubmissions(submissionIds: string[], action: str
       
       if (!response.ok) {
         const errorText = await response.text()
-        console.error(`Failed to update submission ${submissionId}:`, errorText)
+        logger.error(`Failed to update submission ${submissionId}:`, errorText)
         throw new Error(`Failed to update submission: ${response.status}`)
       }
       
@@ -2351,10 +2330,10 @@ export async function bulkUpdateSubmissions(submissionIds: string[], action: str
     })
     
     const results = await Promise.all(updatePromises)
-    console.log('Bulk update completed:', results.length, 'submissions updated')
+    logger.log('Bulk update completed:', results.length, 'submissions updated')
     return results
   } catch (err: any) {
-    console.error('Error in bulkUpdateSubmissions:', err)
+    logger.error('Error in bulkUpdateSubmissions:', err)
     throw err
   }
 }

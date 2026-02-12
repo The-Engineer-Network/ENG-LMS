@@ -47,7 +47,6 @@ export default function WhitelistPage() {
         setTracks(tracksData)
         setCohorts(cohortsData)
       } catch (error) {
-        console.error('Error loading whitelist data:', error)
         setWhitelist([])
         setTracks([])
         setCohorts([])
@@ -74,15 +73,9 @@ export default function WhitelistPage() {
     
     setFormLoading(true)
     try {
-      console.log('Form data:', newEntry)
-      console.log('Available tracks:', tracks)
-      console.log('Available cohorts:', cohorts)
-      
       // Fix: Use the selected IDs directly instead of searching by name
       const trackId = newEntry.track
       const cohortId = newEntry.cohort
-      
-      console.log('Selected trackId:', trackId, 'cohortId:', cohortId)
       
       if (!trackId || !cohortId) {
         showToast({
@@ -120,7 +113,6 @@ export default function WhitelistPage() {
       setNewEntry({ email: "", track: "", cohort: "" })
       setShowAddForm(false)
     } catch (error) {
-      console.error('Error adding whitelist entry:', error)
       showToast({
         type: 'error',
         title: 'Add Failed',
@@ -169,7 +161,6 @@ export default function WhitelistPage() {
       setBulkData("")
       setShowBulkUpload(false)
     } catch (error) {
-      console.error('Error bulk uploading entries:', error)
       showToast({
         type: 'error',
         title: 'Bulk Upload Failed',
@@ -197,7 +188,6 @@ export default function WhitelistPage() {
         message: 'Whitelist entry has been removed successfully.'
       })
     } catch (error: any) {
-      console.error('Error removing entry:', error)
       showToast({
         type: 'error',
         title: 'Remove Failed',

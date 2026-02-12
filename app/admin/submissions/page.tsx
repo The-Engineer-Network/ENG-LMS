@@ -5,6 +5,7 @@ import { CheckCircle2, Clock, AlertCircle, MessageSquare, ExternalLink, Eye, Thu
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useToast } from "@/components/ui/toast"
 import { getTaskSubmissions, updateSubmissionReview, bulkUpdateSubmissions } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function SubmissionsPage() {
   const { user, loading: authLoading } = useAuth()
@@ -30,12 +31,12 @@ export default function SubmissionsPage() {
       
       try {
         const submissionsData = await getTaskSubmissions()
-        console.log('Raw submissions data:', submissionsData)
+        logger.log('Raw submissions data:', submissionsData)
         
         // Use the data directly - it's already enriched
         setSubmissions(submissionsData)
       } catch (error) {
-        console.error('Error loading submissions:', error)
+        logger.error('Error loading submissions:', error)
         setSubmissions([])
       } finally {
         setLoading(false)
@@ -136,7 +137,7 @@ export default function SubmissionsPage() {
       setSelectedSubmission(null)
       setReviewForm({ status: "", feedback: "", grade: "" })
     } catch (error) {
-      console.error('Error submitting review:', error)
+      logger.error('Error submitting review:', error)
       alert('Failed to submit review')
     }
   }
@@ -158,7 +159,7 @@ export default function SubmissionsPage() {
           : sub
       ))
     } catch (error) {
-      console.error('Error with quick action:', error)
+      logger.error('Error with quick action:', error)
       alert('Failed to update submission')
     }
   }
@@ -225,7 +226,7 @@ export default function SubmissionsPage() {
         message: `Successfully ${bulkAction}ed ${selectedSubmissions.length} submissions`
       })
     } catch (error) {
-      console.error('Bulk action failed:', error)
+      logger.error('Bulk action failed:', error)
       showToast({
         type: 'error',
         title: 'Bulk Action Failed',

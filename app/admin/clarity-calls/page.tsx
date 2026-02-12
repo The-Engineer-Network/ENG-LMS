@@ -50,7 +50,6 @@ export default function AdminClarityCallsPage() {
         
         setRequests(transformedRequests)
       } catch (error) {
-        console.error('Error loading clarity requests:', error)
         setRequests([])
       } finally {
         setLoading(false)
@@ -140,7 +139,6 @@ export default function AdminClarityCallsPage() {
       setSelectedRequest(null)
       setScheduleForm({ date: "", time: "", meetingLink: "", mentorNotes: "" })
     } catch (error) {
-      console.error('Error scheduling clarity call:', error)
       alert('Failed to schedule clarity call')
     }
   }
@@ -160,7 +158,6 @@ export default function AdminClarityCallsPage() {
             : req
         ))
       } catch (error) {
-        console.error('Error rejecting request:', error)
         alert('Failed to reject request')
       }
     }
@@ -179,7 +176,6 @@ export default function AdminClarityCallsPage() {
           : req
       ))
     } catch (error) {
-      console.error('Error completing request:', error)
       alert('Failed to mark request as completed')
     }
   }

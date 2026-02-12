@@ -6,6 +6,7 @@ import { useParams } from "next/navigation"
 import { ArrowLeft, Calendar, Clock, FileText, Send, CheckCircle2 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { getAssignmentById, getStudentSubmissionForAssignment } from "@/lib/data"
+import { logger } from "@/lib/logger"
 
 export default function TaskDetailPage() {
   const { user, loading: authLoading } = useAuth()
@@ -29,7 +30,7 @@ export default function TaskDetailPage() {
         setAssignment(assignmentData)
         setSubmission(submissionData)
       } catch (error) {
-        console.error('Error loading task detail:', error)
+        logger.error('Error loading task detail:', error)
       } finally {
         setLoading(false)
       }
